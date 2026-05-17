@@ -7,6 +7,7 @@ import {
   formatAgentPhoneStreamingResponse,
   verifyAgentPhoneSignature
 } from "./agentphone.js";
+import { initLangfuseTracing, shutdownLangfuseTracing } from "./tracing.js";
 
 type RawBodyRequest = Request & {
   rawBody?: Buffer;
@@ -110,8 +111,18 @@ export function createApp(answerService: AnswerService = answerCaller) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
+  initLangfuseTracing();
   const app = createApp();
-  app.listen(config.PORT, config.HOST, () => {
+  const server = app.listen(config.PORT, config.HOST, () => {
     console.log(`ycagentphone listening on http://${config.HOST}:${config.PORT}`);
   });
+
+  const shutdown = async () => {
+    server.close();
+    await shutdownLangfuseTracing();
+    process.exit(0);
+  };
+
+  process.once("SIGINT", shutdown);
+  process.once("SIGTERM", shutdown);
 }

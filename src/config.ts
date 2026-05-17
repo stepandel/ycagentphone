@@ -6,9 +6,21 @@ const optionalNonEmptyString = z.preprocess(
   z.string().min(1).optional()
 );
 
+const optionalBoolean = z.preprocess((value) => {
+  if (value === "" || value === undefined) return undefined;
+  if (typeof value === "string") return ["1", "true", "yes", "on"].includes(value.toLowerCase());
+  return value;
+}, z.boolean().optional());
+
 const envSchema = z.object({
   OPENAI_API_KEY: optionalNonEmptyString,
   OPENAI_MODEL: z.string().default("gpt-4.1-mini"),
+  LANGFUSE_TRACING_ENABLED: optionalBoolean.default(true),
+  LANGFUSE_PUBLIC_KEY: optionalNonEmptyString,
+  LANGFUSE_SECRET_KEY: optionalNonEmptyString,
+  LANGFUSE_BASE_URL: optionalNonEmptyString,
+  LANGFUSE_TRACING_ENVIRONMENT: optionalNonEmptyString,
+  LANGFUSE_RELEASE: optionalNonEmptyString,
   SUPERMEMORY_API_KEY: optionalNonEmptyString,
   SUPERMEMORY_CONTAINER_TAG: z.string().min(1).default("ycagentphone-restaurant-kb"),
   SUPERMEMORY_SEARCH_LIMIT: z.coerce.number().int().positive().default(8),

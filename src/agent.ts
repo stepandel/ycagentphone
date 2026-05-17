@@ -3,6 +3,7 @@ import { config } from "./config.js";
 import { formatKnowledgeSnippets, searchKnowledgebase } from "./memory.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { buildSkillContext } from "./skills/index.js";
+import { observeOpenAIForTurn, withAnswerTrace, withKnowledgeRetrievalTrace } from "./tracing.js";
 
 export type AnswerOptions = {
   transcript?: string;
@@ -27,15 +28,15 @@ function getOpenAI(): OpenAI {
   return openai;
 }
 
-export const answerCaller: AnswerService = async ({ transcript, isCallStart, callId, caller }) => {
+export const answerCaller: AnswerService = async ({ transcript, isCallStart, callId, caller }) => withAnswerTrace({ transcript, isCallStart, callId, caller }, async () => {
   if (isCallStart || !transcript?.trim()) {
     return config.RESTAURANT_GREETING;
   }
 
-  const knowledge = await searchKnowledgebase(transcript);
+  const knowledge = await withKnowledgeRetrievalTrace(transcript, () => searchKnowledgebase(transcript));
   const skillContext = buildSkillContext(transcript);
 
-  const response = await getOpenAI().responses.create({
+  const response = await observeOpenAIForTurn(getOpenAI(), { transcript, isCallStart, callId, caller }).responses.create({
     model: config.OPENAI_MODEL,
     instructions: buildSystemPrompt(config.COMPANY_NAME, config.PUBLIC_CONTACT_EMAIL),
     input: [
@@ -63,4 +64,4 @@ export const answerCaller: AnswerService = async ({ transcript, isCallStart, cal
   });
 
   return response.output_text.trim();
-};
+});
