@@ -2,6 +2,12 @@ import { mkdir, readFile, appendFile } from "node:fs/promises";
 import path from "node:path";
 import { config } from "./config.js";
 import type { ReservationDetails } from "./post-call.js";
+import {
+  createReservation,
+  openReservationDatabase,
+  parseReservationDateTime,
+  seedDiningTables
+} from "./reservation-store.js";
 
 const RESERVATION_MARKER = "<!-- reservation-log-entry ";
 const FOLLOW_UP_MARKER = "<!-- reservation-log-follow-up ";
@@ -30,6 +36,11 @@ export type ReservationLogRecord =
 
 function normalizePhone(value: string): string {
   return value.replace(/[^\d+]/g, "");
+}
+
+function parsePartySize(value: string | undefined): number | undefined {
+  const match = value?.match(/\d+/);
+  return match ? Number(match[0]) : undefined;
 }
 
 function reservationId(callId: string | undefined, caller: string, createdAt: string): string {
@@ -169,10 +180,36 @@ export function createReservationLogEntry(input: {
 
 export async function appendReservationLogEntry(entry: ReservationLogEntry, logPath?: string): Promise<void> {
   await appendMarkdown(formatReservationEntry(entry), logPath);
+  if (!logPath || logPath === config.RESERVATION_LOG_PATH) {
+    await appendReservationLogEntryToSqlite(entry);
+  }
 }
 
 export async function appendReservationLogFollowUp(followUp: ReservationLogFollowUp, logPath?: string): Promise<void> {
   await appendMarkdown(formatFollowUp(followUp), logPath);
+}
+
+export async function appendReservationLogEntryToSqlite(entry: ReservationLogEntry): Promise<void> {
+  const startsAt = parseReservationDateTime(entry.reservation.day, entry.reservation.time, new Date(entry.createdAt));
+  const partySize = parsePartySize(entry.reservation.partySize);
+  if (!startsAt || !partySize) return;
+
+  const db = openReservationDatabase();
+  try {
+    seedDiningTables(db);
+    createReservation(db, {
+      id: entry.id,
+      sourceCallId: entry.callId,
+      guestName: entry.reservation.guestName ?? "Unknown guest",
+      phone: entry.caller,
+      partySize,
+      startsAt,
+      notes: [entry.reservation.specialNotes, entry.conversationContext].filter(Boolean).join("; ") || undefined,
+      createdAt: entry.createdAt
+    });
+  } finally {
+    db.close();
+  }
 }
 
 export async function loadReservationLogRecords(logPath = config.RESERVATION_LOG_PATH): Promise<ReservationLogRecord[]> {

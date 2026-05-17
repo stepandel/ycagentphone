@@ -95,6 +95,71 @@ type ReservationLogRow = {
   notes: string | null;
 };
 
+export type ParsedReservationRequest = {
+  partySize?: number;
+  startsAt?: Date;
+};
+
+const NUMBER_WORDS: Record<string, number> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  thirteen: 13,
+  fourteen: 14,
+  fifteen: 15,
+  sixteen: 16,
+  seventeen: 17,
+  eighteen: 18,
+  nineteen: 19,
+  twenty: 20
+};
+
+const WEEKDAY_INDEX: Record<string, number> = {
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6
+};
+
+const MONTH_INDEX: Record<string, number> = {
+  january: 0,
+  jan: 0,
+  february: 1,
+  feb: 1,
+  march: 2,
+  mar: 2,
+  april: 3,
+  apr: 3,
+  may: 4,
+  june: 5,
+  jun: 5,
+  july: 6,
+  jul: 6,
+  august: 7,
+  aug: 7,
+  september: 8,
+  sep: 8,
+  sept: 8,
+  october: 9,
+  oct: 9,
+  november: 10,
+  nov: 10,
+  december: 11,
+  dec: 11
+};
+
 export const DEFAULT_DINING_TABLES: DiningTableInput[] = [
   { name: "Bar 1", capacity: 2, area: "bar" },
   { name: "Bar 2", capacity: 2, area: "bar" },
@@ -144,6 +209,133 @@ function localTime(iso: string): string {
     minute: "2-digit",
     hour12: false
   }).format(new Date(iso));
+}
+
+function localDateParts(date: Date): { year: number; month: number; day: number; weekday: number } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: config.RESTAURANT_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "long"
+  })
+    .formatToParts(date)
+    .reduce<Record<string, string>>((result, part) => {
+      result[part.type] = part.value;
+      return result;
+    }, {});
+
+  return {
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
+    weekday: WEEKDAY_INDEX[parts.weekday.toLowerCase()]
+  };
+}
+
+function timeZoneOffsetMinutes(date: Date): number {
+  const value = new Intl.DateTimeFormat("en-US", {
+    timeZone: config.RESTAURANT_TIME_ZONE,
+    timeZoneName: "shortOffset"
+  })
+    .formatToParts(date)
+    .find((part) => part.type === "timeZoneName")?.value;
+  const match = value?.match(/^GMT([+-])(\d{1,2})(?::(\d{2}))?$/);
+  if (!match) return -date.getTimezoneOffset();
+  const sign = match[1] === "-" ? -1 : 1;
+  return sign * (Number(match[2]) * 60 + Number(match[3] ?? "0"));
+}
+
+function restaurantDateTime(year: number, monthIndex: number, day: number, hour: number, minute: number): Date {
+  const utcGuess = new Date(Date.UTC(year, monthIndex, day, hour, minute));
+  const offset = timeZoneOffsetMinutes(utcGuess);
+  return new Date(Date.UTC(year, monthIndex, day, hour, minute) - offset * 60_000);
+}
+
+function parsePartySizeText(text: string | undefined): number | undefined {
+  if (!text) return undefined;
+  const normalized = text.toLowerCase();
+  const match = normalized.match(
+    /\b(?:party|table|reservation|booking)\s+(?:of|for)\s+(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)\b/
+  );
+  if (!match) return undefined;
+  return /^\d+$/.test(match[1]) ? Number(match[1]) : NUMBER_WORDS[match[1]];
+}
+
+function parseRequestedTime(text: string): { hour: number; minute: number } | undefined {
+  const matches = text.matchAll(/\b(?:(at|around|for|by)\s*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/gi);
+  for (const match of matches) {
+    if (!match[1] && !match[4]) continue;
+    let hour = Number(match[2]);
+    const minute = Number(match[3] ?? "0");
+    const meridiem = match[4]?.toLowerCase();
+    if (hour > 23 || minute > 59) continue;
+    if (meridiem === "pm" && hour < 12) hour += 12;
+    if (meridiem === "am" && hour === 12) hour = 0;
+    if (!meridiem && hour >= 1 && hour <= 11) hour += 12;
+    return { hour, minute };
+  }
+  return undefined;
+}
+
+function parseRequestedDate(text: string, now: Date): { year: number; monthIndex: number; day: number } | undefined {
+  const lowered = text.toLowerCase();
+  const today = localDateParts(now);
+
+  const isoMatch = lowered.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
+  if (isoMatch) {
+    return { year: Number(isoMatch[1]), monthIndex: Number(isoMatch[2]) - 1, day: Number(isoMatch[3]) };
+  }
+
+  const monthDayMatch = lowered.match(
+    /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,\s*(20\d{2}))?\b/
+  );
+  if (monthDayMatch) {
+    const monthIndex = MONTH_INDEX[monthDayMatch[1].replace(".", "")];
+    let year = monthDayMatch[3] ? Number(monthDayMatch[3]) : today.year;
+    if (!monthDayMatch[3] && monthIndex < today.month - 1) year += 1;
+    return { year, monthIndex, day: Number(monthDayMatch[2]) };
+  }
+
+  if (/\btomorrow\b/.test(lowered)) {
+    const date = restaurantDateTime(today.year, today.month - 1, today.day + 1, 12, 0);
+    const parts = localDateParts(date);
+    return { year: parts.year, monthIndex: parts.month - 1, day: parts.day };
+  }
+
+  if (/\btoday\b/.test(lowered)) {
+    return { year: today.year, monthIndex: today.month - 1, day: today.day };
+  }
+
+  const weekdayMatch = lowered.match(/\b(?:next\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/);
+  if (weekdayMatch) {
+    const target = WEEKDAY_INDEX[weekdayMatch[1]];
+    const explicitlyNext = weekdayMatch[0].startsWith("next ");
+    let daysAhead = (target - today.weekday + 7) % 7;
+    if (daysAhead === 0 || explicitlyNext) daysAhead += 7;
+    const date = restaurantDateTime(today.year, today.month - 1, today.day + daysAhead, 12, 0);
+    const parts = localDateParts(date);
+    return { year: parts.year, monthIndex: parts.month - 1, day: parts.day };
+  }
+
+  return undefined;
+}
+
+export function parseReservationRequestText(text: string | undefined, now = new Date()): ParsedReservationRequest {
+  if (!text?.trim()) return {};
+  const date = parseRequestedDate(text, now);
+  const time = parseRequestedTime(text);
+  return {
+    partySize: parsePartySizeText(text),
+    startsAt: date && time ? restaurantDateTime(date.year, date.monthIndex, date.day, time.hour, time.minute) : undefined
+  };
+}
+
+export function parseReservationDateTime(day: string | undefined, time: string | undefined, now = new Date()): Date | undefined {
+  if (!day || !time) return undefined;
+  const date = parseRequestedDate(day, now);
+  const parsedTime = parseRequestedTime(time);
+  return date && parsedTime ? restaurantDateTime(date.year, date.monthIndex, date.day, parsedTime.hour, parsedTime.minute) : undefined;
 }
 
 function reservationId(createdAt: string): string {
@@ -492,4 +684,22 @@ export function formatAvailabilityContext(db: Database, request: AvailabilityReq
     `Suggested table assignment: ${suggestedTables}`,
     formatReservationDayLog(db, date)
   ].join("\n");
+}
+
+export function formatAvailabilityContextForTranscript(transcript: string | undefined): string {
+  const parsed = parseReservationRequestText(transcript);
+  if (!parsed.partySize || !parsed.startsAt) {
+    return "SQLite reservation availability: request does not yet include a parseable party size, date, and time.";
+  }
+
+  const db = openReservationDatabase();
+  try {
+    seedDiningTables(db);
+    return formatAvailabilityContext(db, {
+      partySize: parsed.partySize,
+      startsAt: parsed.startsAt
+    });
+  } finally {
+    db.close();
+  }
 }

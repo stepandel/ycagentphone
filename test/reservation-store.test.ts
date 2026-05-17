@@ -7,6 +7,8 @@ import {
   formatAvailabilityContext,
   formatReservationDayLog,
   initializeReservationSchema,
+  parseReservationDateTime,
+  parseReservationRequestText,
   seedDiningTables
 } from "../src/reservation-store.js";
 
@@ -99,5 +101,15 @@ describe("reservation store", () => {
     expect(context).toContain("Default dining time: 75 minutes");
     expect(context).toContain("Available: yes");
     expect(context).toContain("Taylor; party of 4");
+  });
+
+  it("parses common caller reservation language into restaurant-local datetimes", () => {
+    const now = new Date("2026-05-17T19:00:00-07:00");
+
+    const request = parseReservationRequestText("Can I book a table for four Friday at 7?", now);
+    expect(request.partySize).toBe(4);
+    expect(request.startsAt?.toISOString()).toBe("2026-05-23T02:00:00.000Z");
+
+    expect(parseReservationDateTime("May 22", "7:30 PM", now)?.toISOString()).toBe("2026-05-23T02:30:00.000Z");
   });
 });
