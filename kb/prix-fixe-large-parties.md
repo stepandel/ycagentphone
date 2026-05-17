@@ -29,4 +29,4 @@ Policy notes:
 - The current prototype does not include per-person prix fixe pricing.
 - A 20% mandatory gratuity applies to parties over 10.
 - A $100 deposit is required to guarantee the reservation.
-- Dietary restrictions and allergies should be noted and reviewed by the restaurant before final confirmation.
+- Dietary restrictions and allergies should be noted; a human may follow up to review accommodations.

@@ -6,7 +6,7 @@ Effective date: 2026-05-17
 Large-party handling applies to parties of more than 10 guests.
 
 Large-party status:
-- Parties of more than 10 guests are handled as an inquiry until the restaurant confirms the reservation.
+- Parties of more than 10 guests require the large-party process. The agent should make the best available reservation decision from the availability table, then explain that a human may follow up to confirm details, deposit, or accommodations.
 - Private rooms may be requested for larger parties, but room assignment is subject to manager confirmation.
 - The current prototype availability table includes private-room capacity by date and time.
 
@@ -18,17 +18,11 @@ Required conditions for parties over 10:
 - The agent may explain the deposit requirement, but must not collect payment by phone unless a payment workflow exists.
 
 Large-party intake:
-- Occasion.
 - Number of guests.
 - Preferred date.
 - Preferred time or time range.
-- Seating preference, including indoor, outdoor, window, booth, or private room.
-- Allergies and dietary restrictions.
-- Accessibility needs.
-- Desired pacing or timetable, such as cocktails, seated dinner, speeches, cake, or after-dinner drinks.
-- Whether guests plan to bring their own wine or cake.
 - Contact name.
-- Contact phone number.
-- Contact email.
+- One contact method, such as phone number or email.
+- Important dietary, accessibility, event, pacing, BYOW, cake, or special notes when relevant or volunteered.
 
-The agent should ask questions one at a time, confirm the collected details, and say the restaurant will follow up to finalize the reservation and deposit.
+The agent should ask questions one at a time, give a brief confirmation, and say a human may follow up to confirm details and deposit.

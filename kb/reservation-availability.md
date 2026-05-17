@@ -3,7 +3,7 @@
 Audience: Caller-facing.
 Effective date: 2026-05-17
 
-This is prototype availability for reservation-taking development. The agent may use it to discuss openings, but final reservations still require restaurant confirmation.
+This is prototype availability for reservation-taking development. The agent may use it to take standard phone reservations for parties of 10 or fewer when a listed slot has enough capacity.
 
 The restaurant has 2 private rooms total. Each private room fits up to 30 people.
 

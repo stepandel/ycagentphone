@@ -3,25 +3,21 @@
 Audience: Caller-facing.
 Effective date: 2026-05-17
 
-The agent may collect reservation requests and discuss listed prototype availability. A reservation is not guaranteed until the restaurant confirms it and any required deposit is completed.
+The agent may take standard reservations by phone and discuss listed prototype availability. For parties of 10 or fewer, if the requested slot appears available, the agent should tell the guest they are down for that reservation.
 
 Standard reservation intake:
 - Guest name.
 - Number of guests.
 - Preferred date.
 - Preferred time or time range.
-- Seating preference: indoor, outdoor, window, booth, or private room for larger parties.
-- Contact phone number.
-- Contact email.
-- Allergies, dietary restrictions, accessibility needs, or other special requests.
-- Whether the visit is for a special occasion.
-
+- One contact method, such as phone number or email.
+- Seating preference, allergies, dietary restrictions, accessibility needs, special occasion, BYOW, cake, or other special requests when relevant or volunteered.
 Call flow:
 - Ask one question at a time.
-- If the requested slot appears available, say it appears available based on the current table, then continue collecting details.
+- If the requested slot appears available for a party of 10 or fewer, say the guest is down for that reservation.
 - If the requested slot is not available, offer the closest available time or seating option from the availability table.
-- Read back the important details before ending the call.
-- Do not promise a specific table, outdoor seating, private room, or final confirmation.
+- Read back only the important details before ending the call: name, party size, date, time, and any important special note.
+- Do not promise a specific table, outdoor seating, private room, allergy accommodation, or payment completion.
 
 Notes:
 - BYOW is allowed. Note it on the reservation request.

@@ -26,7 +26,10 @@ describe("reservation-taking skill", () => {
     expect(context).toContain("BYOW is allowed");
     expect(context).toContain("Bring-your-own cake is allowed");
     expect(context).toContain("use the availability table and caller preferences to make the best reservation decision");
+    expect(context).toContain("Taking reservations by phone is allowed");
+    expect(context).toContain("Say yes and proceed with the reservation workflow");
     expect(context).toContain("Essential details: guest name, party size, preferred date");
+    expect(context).toContain("I have you down for");
     expect(context).toContain("give a short confirmation with name, party size, date, time");
     expect(context).toContain("choose the closest sensible alternative");
   });
