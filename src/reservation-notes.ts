@@ -1,5 +1,5 @@
 import { mkdir, appendFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { extname, resolve } from "node:path";
 import type { CallTurn } from "./agentphone.js";
 import { config } from "./config.js";
 import { isReservationQuery } from "./skills/reservation-taking.js";
@@ -17,6 +17,22 @@ function markdownValue(value: string | undefined): string {
 
 function fenced(value: string): string {
   return value.replaceAll("```", "'''").trim();
+}
+
+function safeFilename(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 120);
+}
+
+export function reservationNoteFilePath(notesPath: string, { callId, now = new Date() }: Pick<ReservationNoteOptions, "callId" | "now">): string {
+  const basePath = resolve(notesPath);
+  const baseDir = extname(basePath).toLowerCase() === ".md" ? resolve(basePath, "..") : basePath;
+  const filename = safeFilename(callId ?? `reservation-${now.toISOString()}`) || `reservation-${now.getTime()}`;
+  return resolve(baseDir, `${filename}.md`);
 }
 
 export function formatReservationNote({ callId, caller, transcript, answer, now = new Date() }: ReservationNoteOptions): string {
@@ -47,8 +63,8 @@ export async function appendReservationNote(options: ReservationNoteOptions): Pr
     return false;
   }
 
-  const absolutePath = resolve(notesPath);
-  await mkdir(dirname(absolutePath), { recursive: true });
+  const absolutePath = reservationNoteFilePath(notesPath, options);
+  await mkdir(resolve(absolutePath, ".."), { recursive: true });
   await appendFile(absolutePath, `${formatReservationNote(options)}\n`, "utf8");
   return true;
 }
