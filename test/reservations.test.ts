@@ -13,9 +13,12 @@ describe("reservation-taking skill", () => {
     const context = buildSkillContext("I need a private room for 12 people");
 
     expect(context).toContain("Skill: reservation-taking");
-    expect(context).toContain("2026-05-19 | 6:30 PM");
-    expect(context).toContain("Indoor");
-    expect(context).toContain("Private room");
+    expect(context).toContain("Mock availability table for the next 14 days");
+    expect(context).toContain("2026-05-30 | 8 | 4 | 0");
+    expect(context).toContain("Indoor seats available");
+    expect(context).toContain("Outdoor seats available");
+    expect(context).toContain("Private rooms available");
+    expect(context).toContain("The restaurant has 2 private rooms total");
     expect(context).toContain("four-course prix fixe menu");
     expect(context).toContain("20% mandatory gratuity");
     expect(context).toContain("$100 deposit");
