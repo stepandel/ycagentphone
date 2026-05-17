@@ -11,6 +11,7 @@
     "test": "bun test test/agentphone.test.ts test/server.test.ts test/post-call.test.ts test/reservations.test.ts test/memory.test.ts",
     "lint": "tsc -p tsconfig.json --noEmit",
     "configure:webhook": "bun scripts/configure-agentphone-webhook.ts",
+    "configure:stripe": "bun scripts/configure-stripe-test.ts",
     "ingest:kb": "bun scripts/ingest-kb.ts",
     "test:webhook": "bun scripts/test-webhook.ts",
     "test:turn": "bun scripts/test-turn.ts"

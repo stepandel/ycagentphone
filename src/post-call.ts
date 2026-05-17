@@ -99,15 +99,19 @@ export async function extractPostCallSummary(call: PostCallWebhook): Promise<Pos
   return normalizeSummary(JSON.parse(response.output_text.trim()));
 }
 
-export function formatReservationConfirmationMessage(summary: PostCallSummary): string {
+export function formatReservationConfirmationMessage(
+  summary: PostCallSummary,
+  paymentLinkUrl: string | undefined = config.STRIPE_RESERVATION_PAYMENT_LINK_URL
+): string {
   const { reservation } = summary;
   const details = [
     `Party size: ${reservation.partySize || "not specified"}`,
     `Day/time: ${[reservation.day, reservation.time].filter(Boolean).join(" at ") || "not specified"}`,
     `Special notes: ${reservation.specialNotes || "none"}`
   ];
+  const payment = paymentLinkUrl ? ` Deposit/payment link: ${paymentLinkUrl}.` : "";
 
-  return `Thanks for calling ${config.COMPANY_NAME}. We noted your reservation details: ${details.join("; ")}. The restaurant will follow up to confirm.`;
+  return `Thanks for calling ${config.COMPANY_NAME}. We noted your reservation details: ${details.join("; ")}.${payment} The restaurant will follow up to confirm.`;
 }
 
 export function createPostCallService(

@@ -17,6 +17,11 @@ const agentPhoneBaseUrl = z.preprocess(
   z.string().url().default("https://api.agentphone.ai")
 );
 
+const optionalUrl = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.string().url().optional()
+);
+
 const envSchema = z.object({
   OPENAI_API_KEY: optionalNonEmptyString,
   OPENAI_MODEL: z.string().default("gpt-4.1-mini"),
@@ -39,6 +44,10 @@ const envSchema = z.object({
   AGENTPHONE_API_KEY: optionalNonEmptyString,
   AGENTPHONE_AGENT_ID: optionalNonEmptyString,
   AGENTPHONE_BASE_URL: agentPhoneBaseUrl,
+  STRIPE_SECRET_KEY: optionalNonEmptyString,
+  STRIPE_RESERVATION_PAYMENT_LINK_URL: optionalUrl,
+  STRIPE_RESERVATION_DEPOSIT_AMOUNT_CENTS: z.coerce.number().int().positive().default(10000),
+  STRIPE_RESERVATION_DEPOSIT_CURRENCY: z.string().min(3).max(3).default("usd"),
   COMPANY_NAME: z.string().default("Your Restaurant"),
   RESTAURANT_GREETING: z.string().default("Good evening, and thank you for calling. This is the restaurant's virtual host. How may I help you today?"),
   RESTAURANT_PROCESSING_MESSAGE: z.string().default("Of course. Let me check that for you."),

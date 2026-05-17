@@ -38,6 +38,10 @@ AGENTPHONE_API_KEY=...
 AGENTPHONE_AGENT_ID=...
 AGENTPHONE_BASE_URL=https://api.agentphone.ai
 AGENTPHONE_WEBHOOK_BASE_URL=...
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_RESERVATION_DEPOSIT_AMOUNT_CENTS=10000
+STRIPE_RESERVATION_DEPOSIT_CURRENCY=usd
+STRIPE_RESERVATION_PAYMENT_LINK_URL=...
 COMPANY_NAME=...
 RESTAURANT_GREETING="Good evening, and thank you for calling. This is the restaurant's virtual host. How may I help you today?"
 RESTAURANT_PROCESSING_MESSAGE="Of course. Let me check that for you."
@@ -115,6 +119,14 @@ ${AGENTPHONE_WEBHOOK_BASE_URL}/webhooks/agentphone
 It also updates `AGENTPHONE_WEBHOOK_SECRET` in `.env` with the returned AgentPhone signing secret.
 Restart the webhook server after running this command so signature verification uses the new secret.
 
+Configure a Stripe test-mode reservation deposit link:
+
+```bash
+bun run configure:stripe
+```
+
+The script requires `STRIPE_SECRET_KEY=sk_test_...`, creates a `$100` test-mode reservation deposit Payment Link by default, and writes `STRIPE_RESERVATION_PAYMENT_LINK_URL` into `.env`.
+
 The webhook parser accepts several common payload shapes, including:
 
 ```json
@@ -144,7 +156,7 @@ For NDJSON-style streaming, call:
 /webhooks/agentphone?stream=1
 ```
 
-Post-call webhooks use AgentPhone's `agent.call_ended` event. The service extracts the full transcript from `data.transcript`, summarizes reservation context with OpenAI, then sends a brief follow-up message to the caller with party size, day/time, and special notes. Outbound messaging requires `AGENTPHONE_API_KEY` and `AGENTPHONE_AGENT_ID`; `AGENTPHONE_BASE_URL` defaults to `https://api.agentphone.ai`.
+Post-call webhooks use AgentPhone's `agent.call_ended` event. The service extracts the full transcript from `data.transcript`, summarizes reservation context with OpenAI, then sends a brief follow-up message to the caller with party size, day/time, special notes, and `STRIPE_RESERVATION_PAYMENT_LINK_URL` when configured. Outbound messaging requires `AGENTPHONE_API_KEY` and `AGENTPHONE_AGENT_ID`; `AGENTPHONE_BASE_URL` defaults to `https://api.agentphone.ai`.
 
 ## Knowledgebase
 

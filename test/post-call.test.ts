@@ -16,6 +16,24 @@ describe("formatReservationConfirmationMessage", () => {
       })
     ).toContain("Party size: 4; Day/time: Friday, May 22 at 7:00 PM; Special notes: birthday; window table");
   });
+
+  it("includes the Stripe payment link when configured", () => {
+    expect(
+      formatReservationConfirmationMessage(
+        {
+          shouldSend: true,
+          conversationContext: "Caller requested a large-party reservation.",
+          reservation: {
+            partySize: "12",
+            day: "Saturday",
+            time: "8 PM",
+            specialNotes: "large party deposit required"
+          }
+        },
+        "https://buy.stripe.com/test_123"
+      )
+    ).toContain("Deposit/payment link: https://buy.stripe.com/test_123.");
+  });
 });
 
 describe("createPostCallService", () => {
