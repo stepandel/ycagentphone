@@ -5,7 +5,7 @@ Effective date: 2026-05-17
 
 This is prototype availability for reservation-taking development. The agent may use it to discuss openings, but final reservations still require restaurant confirmation.
 
-The restaurant has 2 private rooms total.
+The restaurant has 2 private rooms total. Each private room fits up to 30 people.
 
 | Date | Indoor seats available | Outdoor seats available | Private rooms available |
 | --- | ---: | ---: | ---: |

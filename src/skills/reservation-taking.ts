@@ -48,7 +48,7 @@ Seating notes:
 - Indoor dining is the default and can support most standard parties.
 - Outdoor seating is weather-dependent and should be requested, not promised.
 - Window tables and booths are seating preferences only; note the preference, but do not quote separate window or booth capacity.
-- The restaurant has 2 private rooms total. The table lists how many are available by date.
+- The restaurant has 2 private rooms total. Each private room fits up to 30 people. The table lists how many rooms are available by date.
 - Private rooms are intended for larger parties and are subject to manager confirmation.
 
 Special conditions for parties over 10 guests:

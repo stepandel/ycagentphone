@@ -19,6 +19,7 @@ describe("reservation-taking skill", () => {
     expect(context).toContain("Outdoor seats available");
     expect(context).toContain("Private rooms available");
     expect(context).toContain("The restaurant has 2 private rooms total");
+    expect(context).toContain("Each private room fits up to 30 people");
     expect(context).toContain("four-course prix fixe menu");
     expect(context).toContain("20% mandatory gratuity");
     expect(context).toContain("$100 deposit");
