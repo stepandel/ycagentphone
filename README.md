@@ -39,9 +39,11 @@ AGENTPHONE_AGENT_ID=...
 AGENTPHONE_BASE_URL=https://api.agentphone.ai
 AGENTPHONE_WEBHOOK_BASE_URL=...
 STRIPE_SECRET_KEY=sk_test_...
-STRIPE_RESERVATION_DEPOSIT_AMOUNT_CENTS=10000
+STRIPE_STANDARD_RESERVATION_DEPOSIT_AMOUNT_CENTS=2000
+STRIPE_LARGE_PARTY_RESERVATION_DEPOSIT_AMOUNT_CENTS=10000
 STRIPE_RESERVATION_DEPOSIT_CURRENCY=usd
-STRIPE_RESERVATION_PAYMENT_LINK_URL=...
+STRIPE_STANDARD_RESERVATION_PAYMENT_LINK_URL=...
+STRIPE_LARGE_PARTY_RESERVATION_PAYMENT_LINK_URL=...
 COMPANY_NAME=...
 RESTAURANT_GREETING="Good evening, and thank you for calling. This is the restaurant's virtual host. How may I help you today?"
 RESTAURANT_PROCESSING_MESSAGE="Of course. Let me check that for you."
@@ -125,7 +127,7 @@ Configure a Stripe test-mode reservation deposit link:
 bun run configure:stripe
 ```
 
-The script requires `STRIPE_SECRET_KEY=sk_test_...`, creates a `$100` test-mode reservation deposit Payment Link by default, and writes `STRIPE_RESERVATION_PAYMENT_LINK_URL` into `.env`.
+The script requires `STRIPE_SECRET_KEY=sk_test_...`, creates a test-mode reservation deposit Payment Link using `STRIPE_RESERVATION_DEPOSIT_AMOUNT_CENTS` or the `$20` standard deposit by default, and writes `STRIPE_RESERVATION_PAYMENT_LINK_URL` into `.env`. For production-like behavior, configure separate `STRIPE_STANDARD_RESERVATION_PAYMENT_LINK_URL` and `STRIPE_LARGE_PARTY_RESERVATION_PAYMENT_LINK_URL` links for the `$20` and `$100` deposits.
 
 The webhook parser accepts several common payload shapes, including:
 
@@ -156,7 +158,7 @@ For NDJSON-style streaming, call:
 /webhooks/agentphone?stream=1
 ```
 
-Post-call webhooks use AgentPhone's `agent.call_ended` event. The service extracts the full transcript from `data.transcript`, summarizes reservation context with OpenAI, then sends a brief follow-up message to the caller with party size, day/time, special notes, and `STRIPE_RESERVATION_PAYMENT_LINK_URL` when configured. Outbound messaging requires `AGENTPHONE_API_KEY` and `AGENTPHONE_AGENT_ID`; `AGENTPHONE_BASE_URL` defaults to `https://api.agentphone.ai`.
+Post-call webhooks use AgentPhone's `agent.call_ended` event. The service extracts the full transcript from `data.transcript`, summarizes reservation context with OpenAI, then sends a brief follow-up message to the caller with party size, day/time, special notes, and the correct Stripe deposit link when configured. Parties of 10 or fewer use the `$20` standard reservation deposit; parties over 10 use the `$100` large-party deposit. Outbound messaging requires `AGENTPHONE_API_KEY` and `AGENTPHONE_AGENT_ID`; `AGENTPHONE_BASE_URL` defaults to `https://api.agentphone.ai`.
 
 ## Knowledgebase
 

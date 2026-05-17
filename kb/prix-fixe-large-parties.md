@@ -28,5 +28,5 @@ Course 4 choices:
 Policy notes:
 - The current prototype does not include per-person prix fixe pricing.
 - A 20% mandatory gratuity applies to parties over 10.
-- A $100 deposit is required to guarantee the reservation.
+- A $100 deposit is required and should be completed through the Stripe link sent after the call.
 - Dietary restrictions and allergies should be noted; a human may follow up to review accommodations.

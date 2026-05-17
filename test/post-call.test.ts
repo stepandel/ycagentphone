@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { createPostCallService, formatReservationConfirmationMessage } from "../src/post-call.js";
+import { createPostCallService, formatReservationConfirmationMessage, reservationDepositForPartySize } from "../src/post-call.js";
 
 describe("formatReservationConfirmationMessage", () => {
   it("formats brief reservation details for the caller", () => {
@@ -30,9 +30,31 @@ describe("formatReservationConfirmationMessage", () => {
             specialNotes: "large party deposit required"
           }
         },
-        "https://buy.stripe.com/test_123"
+        { amountLabel: "$100", paymentLinkUrl: "https://buy.stripe.com/test_123" }
       )
-    ).toContain("Deposit/payment link: https://buy.stripe.com/test_123.");
+    ).toContain("please use this $100 Stripe link: https://buy.stripe.com/test_123.");
+  });
+
+  it("uses a $20 deposit for standard reservations", () => {
+    expect(
+      formatReservationConfirmationMessage(
+        {
+          shouldSend: true,
+          conversationContext: "Caller requested a standard reservation.",
+          reservation: {
+            partySize: "4",
+            day: "Friday",
+            time: "7 PM"
+          }
+        },
+        { amountLabel: "$20", paymentLinkUrl: "https://buy.stripe.com/standard" }
+      )
+    ).toContain("please use this $20 Stripe link: https://buy.stripe.com/standard.");
+  });
+
+  it("chooses deposit amount from party size", () => {
+    expect(reservationDepositForPartySize("10 guests").amountLabel).toBe("$20");
+    expect(reservationDepositForPartySize("11 guests").amountLabel).toBe("$100");
   });
 });
 

@@ -31,6 +31,11 @@ export type PostCallMessageSender = (options: Omit<SendAgentPhoneMessageOptions,
 export type PostCallExtractor = (call: PostCallWebhook) => Promise<PostCallSummary>;
 export type PostCallService = (call: PostCallWebhook) => Promise<PostCallResult>;
 
+type ReservationDeposit = {
+  amountLabel: string;
+  paymentLinkUrl?: string;
+};
+
 let openai: OpenAI | undefined;
 
 function getOpenAI(): OpenAI {
@@ -63,6 +68,38 @@ function normalizeSummary(value: unknown): PostCallSummary {
       time: asString(reservation.time),
       specialNotes: asString(reservation.specialNotes)
     }
+  };
+}
+
+function parsePartySize(partySize: string | undefined): number | undefined {
+  const match = partySize?.match(/\d+/);
+  return match ? Number(match[0]) : undefined;
+}
+
+function formatDepositAmount(amountCents: number, currency: string): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+    maximumFractionDigits: amountCents % 100 === 0 ? 0 : 2
+  }).format(amountCents / 100);
+}
+
+export function reservationDepositForPartySize(partySize: string | undefined): ReservationDeposit {
+  const size = parsePartySize(partySize);
+  const isLargeParty = size !== undefined && size > 10;
+  const amountCents = isLargeParty
+    ? config.STRIPE_LARGE_PARTY_RESERVATION_DEPOSIT_AMOUNT_CENTS
+    : config.STRIPE_STANDARD_RESERVATION_DEPOSIT_AMOUNT_CENTS;
+  const specificPaymentLinkUrl = isLargeParty
+    ? config.STRIPE_LARGE_PARTY_RESERVATION_PAYMENT_LINK_URL
+    : config.STRIPE_STANDARD_RESERVATION_PAYMENT_LINK_URL;
+  const paymentLinkUrl =
+    specificPaymentLinkUrl ??
+    (config.STRIPE_RESERVATION_DEPOSIT_AMOUNT_CENTS === amountCents ? config.STRIPE_RESERVATION_PAYMENT_LINK_URL : undefined);
+
+  return {
+    amountLabel: formatDepositAmount(amountCents, config.STRIPE_RESERVATION_DEPOSIT_CURRENCY),
+    paymentLinkUrl
   };
 }
 
@@ -101,7 +138,7 @@ export async function extractPostCallSummary(call: PostCallWebhook): Promise<Pos
 
 export function formatReservationConfirmationMessage(
   summary: PostCallSummary,
-  paymentLinkUrl: string | undefined = config.STRIPE_RESERVATION_PAYMENT_LINK_URL
+  deposit: ReservationDeposit = reservationDepositForPartySize(summary.reservation.partySize)
 ): string {
   const { reservation } = summary;
   const details = [
@@ -109,9 +146,11 @@ export function formatReservationConfirmationMessage(
     `Day/time: ${[reservation.day, reservation.time].filter(Boolean).join(" at ") || "not specified"}`,
     `Special notes: ${reservation.specialNotes || "none"}`
   ];
-  const payment = paymentLinkUrl ? ` Deposit/payment link: ${paymentLinkUrl}.` : "";
+  const payment = deposit.paymentLinkUrl
+    ? ` To complete the reservation deposit, please use this ${deposit.amountLabel} Stripe link: ${deposit.paymentLinkUrl}.`
+    : ` The reservation deposit is ${deposit.amountLabel}; the restaurant will send a Stripe payment link separately.`;
 
-  return `Thanks for calling ${config.COMPANY_NAME}. We noted your reservation details: ${details.join("; ")}.${payment} The restaurant will follow up to confirm.`;
+  return `Thanks for calling ${config.COMPANY_NAME}. We noted your reservation details: ${details.join("; ")}.${payment}`;
 }
 
 export function createPostCallService(

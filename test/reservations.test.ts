@@ -23,6 +23,8 @@ describe("reservation-taking skill", () => {
     expect(context).toContain("four-course prix fixe menu");
     expect(context).toContain("20% mandatory gratuity");
     expect(context).toContain("$100 deposit");
+    expect(context).toContain("$20 deposit");
+    expect(context).toContain("Stripe link sent after the call");
     expect(context).toContain("BYOW is allowed");
     expect(context).toContain("Bring-your-own cake is allowed");
     expect(context).toContain("use the availability table and caller preferences to make the best reservation decision");

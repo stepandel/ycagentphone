@@ -3,7 +3,9 @@ import fs from "node:fs";
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const envPath = ".env";
-const amountCents = Number(process.env.STRIPE_RESERVATION_DEPOSIT_AMOUNT_CENTS || "10000");
+const amountCents = Number(
+  process.env.STRIPE_RESERVATION_DEPOSIT_AMOUNT_CENTS || process.env.STRIPE_STANDARD_RESERVATION_DEPOSIT_AMOUNT_CENTS || "2000"
+);
 const currency = (process.env.STRIPE_RESERVATION_DEPOSIT_CURRENCY || "usd").toLowerCase();
 const companyName = process.env.COMPANY_NAME || "Your Restaurant";
 
@@ -16,7 +18,7 @@ if (!stripeSecretKey.startsWith("sk_test_")) {
 }
 
 if (!Number.isInteger(amountCents) || amountCents <= 0) {
-  throw new Error("STRIPE_RESERVATION_DEPOSIT_AMOUNT_CENTS must be a positive integer.");
+  throw new Error("STRIPE_RESERVATION_DEPOSIT_AMOUNT_CENTS or STRIPE_STANDARD_RESERVATION_DEPOSIT_AMOUNT_CENTS must be a positive integer.");
 }
 
 async function stripePost(path: string, params: URLSearchParams) {
@@ -41,7 +43,7 @@ const params = new URLSearchParams({
   "line_items[0][price_data][currency]": currency,
   "line_items[0][price_data][unit_amount]": String(amountCents),
   "line_items[0][price_data][product_data][name]": `${companyName} reservation deposit`,
-  "line_items[0][price_data][product_data][description]": "Test-mode reservation deposit collected after a phone reservation inquiry.",
+  "line_items[0][price_data][product_data][description]": "Test-mode reservation deposit collected after a phone reservation.",
   "line_items[0][quantity]": "1",
   "metadata[source]": "ycagentphone",
   "metadata[purpose]": "reservation_deposit",

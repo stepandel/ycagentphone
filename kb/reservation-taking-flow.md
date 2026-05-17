@@ -5,6 +5,11 @@ Effective date: 2026-05-17
 
 The agent may take standard reservations by phone and discuss listed prototype availability. For parties of 10 or fewer, if the requested slot appears available, the agent should tell the guest they are down for that reservation.
 
+All reservations require a deposit through a Stripe link sent after the call:
+- Parties of 10 or fewer: $20 deposit.
+- Parties over 10: $100 deposit.
+- The agent should not collect payment by phone.
+
 Standard reservation intake:
 - Guest name.
 - Number of guests.
