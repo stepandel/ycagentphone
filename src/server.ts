@@ -75,7 +75,7 @@ export function createApp(answerService: AnswerService = answerCaller) {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const app = createApp();
-  app.listen(config.PORT, () => {
-    console.log(`ycagentphone listening on http://localhost:${config.PORT}`);
+  app.listen(config.PORT, config.HOST, () => {
+    console.log(`ycagentphone listening on http://${config.HOST}:${config.PORT}`);
   });
 }

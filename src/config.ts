@@ -17,6 +17,7 @@ const envSchema = z.object({
   COMPANY_NAME: z.string().default("Your Company"),
   PUBLIC_CONTACT_EMAIL: z.string().email().default("sales@example.com"),
   PORT: z.coerce.number().int().positive().default(3000),
+  HOST: z.string().default("::"),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info")
 });
 
