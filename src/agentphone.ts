@@ -28,7 +28,11 @@ function transcriptFromMessages(messages: unknown): string | undefined {
   const lines = messages
     .map((message) => {
       const item = asRecord(message);
-      const role = firstString(item.role, item.speaker, item.from) ?? "caller";
+      const direction = firstString(item.direction);
+      const role =
+        firstString(item.role, item.speaker, item.from) ??
+        (direction === "inbound" ? "caller" : direction === "outbound" ? "agent" : undefined) ??
+        "caller";
       const content = firstString(item.content, item.text, item.transcript, item.message);
       return content ? `${role}: ${content}` : undefined;
     })
@@ -55,7 +59,8 @@ export function extractCallTurn(payload: unknown): CallTurn {
       conversation.transcript
     ) ??
     transcriptFromMessages(body.messages) ??
-    transcriptFromMessages(conversation.messages);
+    transcriptFromMessages(conversation.messages) ??
+    transcriptFromMessages(body.recentHistory);
 
   if (!transcript) {
     throw new Error("No caller transcript found in webhook payload.");
@@ -111,8 +116,7 @@ export function formatAgentPhoneResponse(answer: string): UnknownRecord {
 
 export function formatAgentPhoneNdjson(answer: string): string {
   return [
-    JSON.stringify({ type: "text", text: "Let me check that." }),
-    JSON.stringify({ type: "text", text: answer }),
-    JSON.stringify({ type: "done" })
+    JSON.stringify({ text: "Let me check that.", interim: true }),
+    JSON.stringify({ text: answer })
   ].join("\n");
 }

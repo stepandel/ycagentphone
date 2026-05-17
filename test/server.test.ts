@@ -37,6 +37,7 @@ describe("server", () => {
     const response = await postSigned(app, "/webhooks/agentphone?stream=1", { transcript: "Hello" }).expect(200);
 
     expect(response.headers["content-type"]).toContain("application/x-ndjson");
-    expect(response.text).toContain('"type":"done"');
+    expect(response.text).toContain('"interim":true');
+    expect(response.text).toContain('"text":"The answer."');
   });
 });

@@ -1,6 +1,6 @@
 # ycagentphone
 
-Prototype phone Q&A agent for AgentPhone webhooks backed by an OpenAI knowledgebase.
+Prototype phone Q&A agent for AgentPhone webhooks backed by a Supermemory knowledgebase.
 
 ## Architecture
 
@@ -9,7 +9,8 @@ Caller
   -> AgentPhone phone number
   -> AgentPhone webhook
   -> Express service
-  -> OpenAI Responses API with hosted file_search
+  -> Supermemory search
+  -> OpenAI Responses API
   -> AgentPhone speaks the answer
 ```
 
@@ -27,17 +28,18 @@ Edit `.env` and set:
 
 ```bash
 OPENAI_API_KEY=...
+SUPERMEMORY_API_KEY=...
 COMPANY_NAME=...
 PUBLIC_CONTACT_EMAIL=...
 ```
 
-Then seed the hosted knowledgebase:
+Then seed the Supermemory knowledgebase:
 
 ```bash
 bun run ingest:kb
 ```
 
-Copy the printed `OPENAI_VECTOR_STORE_ID` into `.env`.
+The default container tag is `ycagentphone-kb`. Override `SUPERMEMORY_CONTAINER_TAG` in `.env` if you want to use a different memory space.
 
 ## Run Locally
 
@@ -63,6 +65,12 @@ Local turn test through the script:
 
 ```bash
 bun run test:turn -- "What do you cost?"
+```
+
+Signed local webhook test:
+
+```bash
+bun run test:webhook -- "What do you cost?"
 ```
 
 ## AgentPhone Webhook
@@ -134,4 +142,5 @@ bun run ingest:kb
 - The system prompt lives in `src/prompt.ts`.
 - The webhook adapter lives in `src/agentphone.ts`.
 - The OpenAI call lives in `src/agent.ts`.
+- Supermemory retrieval lives in `src/memory.ts`.
 - If AgentPhone provides a signing secret, set `AGENTPHONE_WEBHOOK_SECRET` and confirm the exact signature header/hash format in `src/agentphone.ts`.

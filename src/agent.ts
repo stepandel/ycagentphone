@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { config } from "./config.js";
+import { formatKnowledgeSnippets, searchKnowledgebase } from "./memory.js";
 import { buildSystemPrompt } from "./prompt.js";
 
 export type AnswerOptions = {
@@ -25,14 +26,7 @@ function getOpenAI(): OpenAI {
 }
 
 export const answerCaller: AnswerService = async ({ transcript, callId, caller }) => {
-  const tools = config.OPENAI_VECTOR_STORE_ID
-    ? [
-        {
-          type: "file_search" as const,
-          vector_store_ids: [config.OPENAI_VECTOR_STORE_ID]
-        }
-      ]
-    : [];
+  const knowledge = await searchKnowledgebase(transcript);
 
   const response = await getOpenAI().responses.create({
     model: config.OPENAI_MODEL,
@@ -46,6 +40,8 @@ export const answerCaller: AnswerService = async ({ transcript, callId, caller }
             text: [
               callId ? `Call ID: ${callId}` : undefined,
               caller ? `Caller: ${caller}` : undefined,
+              "Knowledgebase search results:",
+              formatKnowledgeSnippets(knowledge),
               "Caller transcript:",
               transcript
             ]
@@ -54,8 +50,7 @@ export const answerCaller: AnswerService = async ({ transcript, callId, caller }
           }
         ]
       }
-    ],
-    tools
+    ]
   });
 
   return response.output_text.trim();

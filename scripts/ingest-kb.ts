@@ -1,11 +1,22 @@
 import "dotenv/config";
 import fs from "node:fs/promises";
 import path from "node:path";
-import OpenAI, { toFile } from "openai";
+import Supermemory from "supermemory";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const supermemory = new Supermemory({ apiKey: process.env.SUPERMEMORY_API_KEY });
 const root = process.cwd();
 const kbDir = path.join(root, "kb");
+const containerTag = process.env.SUPERMEMORY_CONTAINER_TAG || "ycagentphone-kb";
+
+function customIdForPath(relativePath: string): string {
+  const parsed = path.parse(relativePath);
+  const withoutExtension = path.join(parsed.dir, parsed.name);
+  return withoutExtension
+    .replace(/[^a-zA-Z0-9:_-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 100);
+}
 
 async function listMarkdownFiles(dir: string): Promise<string[]> {
   const entries = await fs.readdir(dir, { withFileTypes: true });
@@ -21,8 +32,8 @@ async function listMarkdownFiles(dir: string): Promise<string[]> {
 }
 
 async function main() {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error("OPENAI_API_KEY is required.");
+  if (!process.env.SUPERMEMORY_API_KEY) {
+    throw new Error("SUPERMEMORY_API_KEY is required.");
   }
 
   const files = await listMarkdownFiles(kbDir);
@@ -30,25 +41,25 @@ async function main() {
     throw new Error(`No markdown files found in ${kbDir}.`);
   }
 
-  const vectorStore =
-    process.env.OPENAI_VECTOR_STORE_ID && process.env.OPENAI_VECTOR_STORE_ID.trim().length > 0
-      ? await openai.vectorStores.retrieve(process.env.OPENAI_VECTOR_STORE_ID)
-      : await openai.vectorStores.create({ name: "ycagentphone-kb" });
+  for (const filePath of files) {
+    const relativePath = path.relative(root, filePath);
+    const content = await fs.readFile(filePath, "utf8");
+    const customId = customIdForPath(relativePath);
 
-  const uploadFiles = await Promise.all(
-    files.map(async (filePath) => {
-      const content = await fs.readFile(filePath);
-      return toFile(content, path.relative(root, filePath), { type: "text/markdown" });
-    })
-  );
+    const result = await supermemory.add({
+      content,
+      customId,
+      containerTag,
+      metadata: {
+        source: relativePath,
+        type: "knowledgebase"
+      }
+    });
 
-  await openai.vectorStores.fileBatches.uploadAndPoll(vectorStore.id, {
-    files: uploadFiles
-  });
+    console.log(`${relativePath}: ${result.id} (${result.status})`);
+  }
 
-  console.log(`Vector store ready: ${vectorStore.id}`);
-  console.log("Add this to .env:");
-  console.log(`OPENAI_VECTOR_STORE_ID=${vectorStore.id}`);
+  console.log(`Knowledgebase queued in Supermemory container: ${containerTag}`);
 }
 
 main().catch((error) => {

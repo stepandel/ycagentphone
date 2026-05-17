@@ -33,6 +33,19 @@ describe("extractCallTurn", () => {
       }).transcript
     ).toContain("caller: Do you integrate with Salesforce?");
   });
+
+  it("extracts transcript text from AgentPhone recentHistory", () => {
+    expect(
+      extractCallTurn({
+        event: "agent.message",
+        channel: "voice",
+        recentHistory: [
+          { direction: "inbound", content: "What do you cost?" },
+          { direction: "outbound", content: "Let me check that." }
+        ]
+      }).transcript
+    ).toContain("caller: What do you cost?");
+  });
 });
 
 describe("verifyAgentPhoneSignature", () => {
