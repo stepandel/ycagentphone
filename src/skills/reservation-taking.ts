@@ -1,3 +1,5 @@
+import type { AgentSkill } from "./types.js";
+
 export const RESERVATION_QUERY_PATTERN =
   /\b(reservation|reserve|book|booking|table|seating|seat|availability|available|party|guests?|people|indoor|outdoor|patio|window|booth|private|room|allerg(?:y|ies|ic)|occasion|birthday|anniversary|cake|byow|wine)\b/i;
 
@@ -5,13 +7,13 @@ export function isReservationQuery(transcript: string | undefined): boolean {
   return RESERVATION_QUERY_PATTERN.test(transcript ?? "");
 }
 
-export function buildReservationOperationalContext(transcript: string | undefined): string {
-  if (!isReservationQuery(transcript)) {
-    return "No reservation-specific context injected for this caller turn.";
-  }
-
-  return `
-Reservation operations context:
+export const reservationTakingSkill: AgentSkill = {
+  name: "reservation-taking",
+  description: "Collects reservation requests, seating preferences, notes, and large-party requirements.",
+  matches: isReservationQuery,
+  buildContext: () =>
+    `
+Skill: reservation-taking
 
 Authority:
 - This is prototype availability for the restaurant. Use it to discuss availability, seating options, policies, and notes.
@@ -56,5 +58,5 @@ Large-party prix fixe menu:
 - Course 2 choices: handmade pasta, grilled prawns, or mushroom risotto.
 - Course 3 choices: roasted chicken, seared fish, or braised short rib.
 - Course 4 choices: chocolate torte, citrus panna cotta, or seasonal sorbet.
-`.trim();
-}
+`.trim()
+};

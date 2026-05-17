@@ -1,7 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { buildReservationOperationalContext, isReservationQuery } from "../src/reservations.js";
+import { buildSkillContext } from "../src/skills/index.js";
+import { isReservationQuery, reservationTakingSkill } from "../src/skills/reservation-taking.js";
 
-describe("reservation operational context", () => {
+describe("reservation-taking skill", () => {
   it("detects reservation-like caller turns", () => {
     expect(isReservationQuery("Can I book a booth for six tomorrow?")).toBe(true);
     expect(isReservationQuery("Do you allow BYOW for an anniversary dinner?")).toBe(true);
@@ -9,8 +10,9 @@ describe("reservation operational context", () => {
   });
 
   it("injects availability, seating, and large-party conditions", () => {
-    const context = buildReservationOperationalContext("I need a private room for 12 people");
+    const context = buildSkillContext("I need a private room for 12 people");
 
+    expect(context).toContain("Skill: reservation-taking");
     expect(context).toContain("2026-05-19 | 6:30 PM");
     expect(context).toContain("Indoor");
     expect(context).toContain("Private room");
@@ -22,8 +24,13 @@ describe("reservation operational context", () => {
   });
 
   it("keeps non-reservation turns concise", () => {
-    expect(buildReservationOperationalContext("What desserts do you have?")).toBe(
-      "No reservation-specific context injected for this caller turn."
-    );
+    expect(buildSkillContext("What desserts do you have?")).toBe("No call skills matched this caller turn.");
+  });
+
+  it("exposes reservation taking as an explicit skill", () => {
+    expect(reservationTakingSkill).toMatchObject({
+      name: "reservation-taking",
+      description: expect.stringContaining("reservation requests")
+    });
   });
 });

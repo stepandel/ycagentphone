@@ -9,6 +9,7 @@ Caller
   -> AgentPhone phone number
   -> AgentPhone webhook
   -> Express service
+  -> Call skill matching
   -> Supermemory search
   -> OpenAI Responses API
   -> AgentPhone speaks the answer
@@ -163,6 +164,7 @@ bun run ingest:kb
 ## Notes
 
 - The system prompt lives in `src/prompt.ts`.
+- Call skills live in `src/skills/`. The reservation-taking flow is `src/skills/reservation-taking.ts`.
 - The webhook adapter lives in `src/agentphone.ts`.
 - The OpenAI call lives in `src/agent.ts`.
 - Supermemory retrieval lives in `src/memory.ts`.

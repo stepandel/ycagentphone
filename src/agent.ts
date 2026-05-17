@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { config } from "./config.js";
 import { formatKnowledgeSnippets, searchKnowledgebase } from "./memory.js";
 import { buildSystemPrompt } from "./prompt.js";
-import { buildReservationOperationalContext } from "./reservations.js";
+import { buildSkillContext } from "./skills/index.js";
 
 export type AnswerOptions = {
   transcript?: string;
@@ -33,7 +33,7 @@ export const answerCaller: AnswerService = async ({ transcript, isCallStart, cal
   }
 
   const knowledge = await searchKnowledgebase(transcript);
-  const reservationContext = buildReservationOperationalContext(transcript);
+  const skillContext = buildSkillContext(transcript);
 
   const response = await getOpenAI().responses.create({
     model: config.OPENAI_MODEL,
@@ -47,7 +47,8 @@ export const answerCaller: AnswerService = async ({ transcript, isCallStart, cal
             text: [
               callId ? `Call ID: ${callId}` : undefined,
               caller ? `Caller: ${caller}` : undefined,
-              reservationContext,
+              "Matched call skill context:",
+              skillContext,
               "Knowledgebase search results:",
               formatKnowledgeSnippets(knowledge),
               "Caller transcript:",
