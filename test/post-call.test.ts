@@ -52,6 +52,27 @@ describe("formatReservationConfirmationMessage", () => {
     ).toContain("please use this $20 Stripe link: https://buy.stripe.com/standard.");
   });
 
+  it("keeps payment-link language out of special notes", () => {
+    const message = formatReservationConfirmationMessage(
+      {
+        shouldSend: true,
+        conversationContext: "Caller requested a standard reservation.",
+        reservation: {
+          partySize: "8",
+          day: "Thursday, May 21st",
+          time: "6:00",
+          specialNotes: "Party of 8; $20 deposit link to be sent."
+        }
+      },
+      { amountLabel: "$20", paymentLinkUrl: "https://buy.stripe.com/standard" }
+    );
+
+    expect(message).toContain("Special notes: Party of 8.");
+    expect(message).toContain("please use this $20 Stripe link: https://buy.stripe.com/standard.");
+    expect(message).not.toContain("link to be sent");
+    expect(message).not.toContain("..");
+  });
+
   it("chooses deposit amount from party size", () => {
     expect(reservationDepositForPartySize("10 guests").amountLabel).toBe("$20");
     expect(reservationDepositForPartySize("11 guests").amountLabel).toBe("$100");

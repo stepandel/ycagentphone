@@ -84,6 +84,20 @@ function formatDepositAmount(amountCents: number, currency: string): string {
   }).format(amountCents / 100);
 }
 
+function cleanMessageDetail(value: string | undefined): string | undefined {
+  return value?.trim().replace(/[.。]+$/u, "") || undefined;
+}
+
+function sanitizeSpecialNotes(notes: string | undefined): string | undefined {
+  const cleaned = notes
+    ?.split(/[;\n.]+/)
+    .map((note) => note.trim())
+    .filter((note) => note && !/\b(deposit|payment|stripe|link)\b|\$\d+/i.test(note))
+    .join("; ");
+
+  return cleanMessageDetail(cleaned);
+}
+
 export function reservationDepositForPartySize(partySize: string | undefined): ReservationDeposit {
   const size = parsePartySize(partySize);
   const isLargeParty = size !== undefined && size > 10;
@@ -93,9 +107,7 @@ export function reservationDepositForPartySize(partySize: string | undefined): R
   const specificPaymentLinkUrl = isLargeParty
     ? config.STRIPE_LARGE_PARTY_RESERVATION_PAYMENT_LINK_URL
     : config.STRIPE_STANDARD_RESERVATION_PAYMENT_LINK_URL;
-  const paymentLinkUrl =
-    specificPaymentLinkUrl ??
-    (config.STRIPE_RESERVATION_DEPOSIT_AMOUNT_CENTS === amountCents ? config.STRIPE_RESERVATION_PAYMENT_LINK_URL : undefined);
+  const paymentLinkUrl = specificPaymentLinkUrl ?? config.STRIPE_RESERVATION_PAYMENT_LINK_URL;
 
   return {
     amountLabel: formatDepositAmount(amountCents, config.STRIPE_RESERVATION_DEPOSIT_CURRENCY),
@@ -141,10 +153,11 @@ export function formatReservationConfirmationMessage(
   deposit: ReservationDeposit = reservationDepositForPartySize(summary.reservation.partySize)
 ): string {
   const { reservation } = summary;
+  const specialNotes = sanitizeSpecialNotes(reservation.specialNotes);
   const details = [
-    `Party size: ${reservation.partySize || "not specified"}`,
-    `Day/time: ${[reservation.day, reservation.time].filter(Boolean).join(" at ") || "not specified"}`,
-    `Special notes: ${reservation.specialNotes || "none"}`
+    `Party size: ${cleanMessageDetail(reservation.partySize) || "not specified"}`,
+    `Day/time: ${[cleanMessageDetail(reservation.day), cleanMessageDetail(reservation.time)].filter(Boolean).join(" at ") || "not specified"}`,
+    `Special notes: ${specialNotes || "none"}`
   ];
   const payment = deposit.paymentLinkUrl
     ? ` To complete the reservation deposit, please use this ${deposit.amountLabel} Stripe link: ${deposit.paymentLinkUrl}.`
