@@ -31,29 +31,47 @@ describe("server", () => {
     expect(response.body.response).toBe("Echo: What do you cost?");
   });
 
-  it("answers inbound SMS without voice streaming and passes text channel context", async () => {
+  it("queues inbound SMS replies and sends the answer as an outbound text", async () => {
     const turns: unknown[] = [];
+    const sent: Array<{ toNumber: string; body: string; numberId?: string }> = [];
+    let resolveReplySent!: () => void;
+    const replySent = new Promise<void>((resolve) => {
+      resolveReplySent = resolve;
+    });
     const app = createApp(async (turn) => {
       turns.push(turn);
       return `Text reply: ${turn.transcript}`;
+    }, undefined, async (message) => {
+      sent.push(message);
+      resolveReplySent();
     });
 
     const response = await postSigned(app, "/webhooks/agentphone", {
       event: "message.received",
       data: {
         channel: "sms",
+        numberId: "num_123",
         fromNumber: "+15551234567",
         body: "Can we move the reservation to 7:30?"
       }
-    }).expect(200);
+    }).expect(202);
 
     expect(response.headers["content-type"]).toContain("application/json");
-    expect(response.body.message).toBe("Text reply: Can we move the reservation to 7:30?");
+    expect(response.body).toEqual({ ok: true, queued: true });
+    await replySent;
     expect(turns[0]).toMatchObject({
       caller: "+15551234567",
+      numberId: "num_123",
       channel: "text",
       transcript: "Can we move the reservation to 7:30?"
     });
+    expect(sent).toEqual([
+      {
+        toNumber: "+15551234567",
+        numberId: "num_123",
+        body: "Text reply: Can we move the reservation to 7:30?"
+      }
+    ]);
   });
 
   it("passes call-start webhooks to the answer service", async () => {

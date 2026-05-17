@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 export type CallTurn = {
   callId?: string;
   caller?: string;
+  numberId?: string;
   channel?: "voice" | "text";
   transcript?: string;
   isCallStart: boolean;
@@ -140,6 +141,7 @@ export function extractCallTurn(payload: unknown): CallTurn {
 
   return {
     callId: firstString(body.callId, body.call_id, body.messageId, data.callId, data.call_id, data.messageId, call.id, call.callId, conversation.id),
+    numberId: firstString(body.numberId, body.number_id, data.numberId, data.number_id, call.numberId, call.number_id),
     caller: firstString(
       body.from,
       body.fromNumber,

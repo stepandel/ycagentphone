@@ -56,12 +56,14 @@ describe("extractCallTurn", () => {
         data: {
           channel: "sms",
           messageId: "msg_123",
+          numberId: "num_123",
           fromNumber: "+15551234567",
           body: "Can we move the reservation to 7:30?"
         }
       })
     ).toMatchObject({
       callId: "msg_123",
+      numberId: "num_123",
       caller: "+15551234567",
       channel: "text",
       transcript: "Can we move the reservation to 7:30?"
@@ -81,6 +83,28 @@ describe("extractCallTurn", () => {
     ).toMatchObject({
       channel: "text",
       transcript: "What time is my reservation?"
+    });
+  });
+
+  it("extracts AgentPhone agent.message SMS payloads", () => {
+    expect(
+      extractCallTurn({
+        event: "agent.message",
+        channel: "sms",
+        data: {
+          conversationId: "conv_123",
+          numberId: "num_123",
+          from: "+15551234567",
+          to: "+15557654321",
+          message: "can we do Friday instead?",
+          direction: "inbound"
+        }
+      })
+    ).toMatchObject({
+      numberId: "num_123",
+      caller: "+15551234567",
+      channel: "text",
+      transcript: "can we do Friday instead?"
     });
   });
 

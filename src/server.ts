@@ -7,6 +7,7 @@ import {
   extractPostCallWebhook,
   formatAgentPhoneResponse,
   formatAgentPhoneStreamingResponse,
+  sendAgentPhoneMessage,
   verifyAgentPhoneSignature
 } from "./agentphone.js";
 import { createPostCallService, type PostCallService } from "./post-call.js";
@@ -23,6 +24,8 @@ import { initLangfuseTracing, shutdownLangfuseTracing } from "./tracing.js";
 type RawBodyRequest = Request & {
   rawBody?: Buffer;
 };
+
+type TextReplySender = (options: { toNumber: string; body: string; numberId?: string }) => Promise<unknown>;
 
 function bodyChannel(body: unknown): string | undefined {
   if (typeof body !== "object" || body === null) return undefined;
@@ -67,7 +70,39 @@ async function recordTextFollowUp(req: Request, turn: ReturnType<typeof extractC
   }
 }
 
-export function createApp(answerService: AnswerService = answerCaller, postCallService: PostCallService = createPostCallService()) {
+async function answerAndSendTextReply(
+  req: Request,
+  turn: ReturnType<typeof extractCallTurn>,
+  answerService: AnswerService,
+  textReplySender: TextReplySender
+): Promise<void> {
+  try {
+    const answer = await answerService(turn);
+    await recordTextFollowUp(req, turn);
+    const text = answerText(answer).trim();
+    if (!text || !turn.caller) return;
+    await textReplySender({
+      toNumber: turn.caller,
+      body: text,
+      numberId: turn.numberId
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown SMS reply error.";
+    console.error(`AgentPhone SMS reply failed: ${message}`);
+  }
+}
+
+export function createApp(
+  answerService: AnswerService = answerCaller,
+  postCallService: PostCallService = createPostCallService(),
+  textReplySender: TextReplySender = (options) =>
+    sendAgentPhoneMessage({
+      ...options,
+      apiKey: config.AGENTPHONE_API_KEY,
+      agentId: config.AGENTPHONE_AGENT_ID,
+      baseUrl: config.AGENTPHONE_BASE_URL
+    })
+) {
   const app = express();
 
   app.use(
@@ -135,6 +170,12 @@ export function createApp(answerService: AnswerService = answerCaller, postCallS
       const message = error instanceof Error ? error.message : "Unknown webhook error.";
       console.error(message);
       res.status(400).json({ error: message });
+      return;
+    }
+
+    if (isTextFollowUp(req, turn)) {
+      res.status(202).json({ ok: true, queued: true });
+      void answerAndSendTextReply(req, turn, answerService, textReplySender);
       return;
     }
 
