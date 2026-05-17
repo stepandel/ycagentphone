@@ -29,6 +29,9 @@ Edit `.env` and set:
 ```bash
 OPENAI_API_KEY=...
 SUPERMEMORY_API_KEY=...
+AGENTPHONE_API_KEY=...
+AGENTPHONE_AGENT_ID=...
+AGENTPHONE_WEBHOOK_BASE_URL=...
 COMPANY_NAME=...
 PUBLIC_CONTACT_EMAIL=...
 ```
@@ -75,17 +78,31 @@ bun run test:webhook -- "Can I book a birthday dinner for 12 people?"
 
 ## AgentPhone Webhook
 
-Expose the local server with ngrok or another tunnel:
+Use a stable public URL for AgentPhone. With ngrok, reserve a static domain in the ngrok dashboard, then run:
 
 ```bash
-ngrok http 3000
+ngrok http --url=YOUR-STATIC-DOMAIN.ngrok-free.app 127.0.0.1:3000
 ```
 
-Configure AgentPhone webhook mode to call:
+Set the stable base URL in `.env`:
+
+```bash
+AGENTPHONE_WEBHOOK_BASE_URL=https://YOUR-STATIC-DOMAIN.ngrok-free.app
+```
+
+Configure AgentPhone from that constant:
+
+```bash
+bun run configure:webhook
+```
+
+That script configures AgentPhone to call:
 
 ```text
-https://YOUR-TUNNEL/webhooks/agentphone
+${AGENTPHONE_WEBHOOK_BASE_URL}/webhooks/agentphone
 ```
+
+It also updates `AGENTPHONE_WEBHOOK_SECRET` in `.env` with the returned AgentPhone signing secret.
 
 The webhook parser accepts several common payload shapes, including:
 

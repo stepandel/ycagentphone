@@ -2,7 +2,11 @@ import "dotenv/config";
 import crypto from "node:crypto";
 
 const transcript = process.argv.slice(2).join(" ").trim() || "What do you cost?";
-const url = process.env.WEBHOOK_TEST_URL || `http://localhost:${process.env.PORT || "3000"}/webhooks/agentphone`;
+const url =
+  process.env.WEBHOOK_TEST_URL ||
+  (process.env.AGENTPHONE_WEBHOOK_BASE_URL
+    ? `${process.env.AGENTPHONE_WEBHOOK_BASE_URL.replace(/\/+$/, "")}/webhooks/agentphone`
+    : `http://localhost:${process.env.PORT || "3000"}/webhooks/agentphone`);
 const secret = process.env.AGENTPHONE_WEBHOOK_SECRET;
 
 const payload = {
