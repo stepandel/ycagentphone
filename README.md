@@ -49,7 +49,7 @@ bun run ingest:kb
 
 The default container tag is `ycagentphone-restaurant-kb`. Override `SUPERMEMORY_CONTAINER_TAG` in `.env` if you want to use a different memory space.
 
-Langfuse tracing is enabled automatically when `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` are set. Each answered turn is traced as `agentphone.answer`, with the OpenAI Responses API call captured as a child generation. Use `LANGFUSE_TRACING_ENABLED=false` to disable trace export locally.
+Langfuse tracing is enabled automatically when `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and `LANGFUSE_BASE_URL` are set. Each answered turn is traced as `agentphone.answer`, with Supermemory retrieval and the OpenAI Responses API call captured underneath it.
 
 ## Run Locally
 
