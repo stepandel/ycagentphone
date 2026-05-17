@@ -49,6 +49,25 @@ describe("extractCallTurn", () => {
     ).toContain("caller: What do you cost?");
   });
 
+  it("extracts inbound SMS message payloads as text turns", () => {
+    expect(
+      extractCallTurn({
+        event: "message.received",
+        data: {
+          channel: "sms",
+          messageId: "msg_123",
+          fromNumber: "+15551234567",
+          body: "Can we move the reservation to 7:30?"
+        }
+      })
+    ).toMatchObject({
+      callId: "msg_123",
+      caller: "+15551234567",
+      channel: "text",
+      transcript: "Can we move the reservation to 7:30?"
+    });
+  });
+
   it("marks payloads without transcript text as call starts", () => {
     expect(
       extractCallTurn({

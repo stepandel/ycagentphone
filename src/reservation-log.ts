@@ -21,6 +21,7 @@ export type ReservationLogFollowUp = {
   caller: string;
   createdAt: string;
   transcript: string;
+  reservationUpdates?: Partial<ReservationDetails>;
 };
 
 export type ReservationLogRecord =
@@ -66,16 +67,20 @@ function formatReservationEntry(entry: ReservationLogEntry): string {
 
 function formatFollowUp(followUp: ReservationLogFollowUp): string {
   const metadata = escapeHtmlComment(JSON.stringify(followUp));
+  const updates = formatReservationUpdates(followUp.reservationUpdates);
   return [
     `### Text follow-up for ${followUp.reservationId}`,
     `${FOLLOW_UP_MARKER}${metadata}${MARKER_END}`,
     "",
     `- Caller: ${followUp.caller}`,
     `- Received: ${followUp.createdAt}`,
+    updates ? `- Reservation updates: ${updates}` : undefined,
     "",
     "> " + followUp.transcript.replace(/\n/g, "\n> "),
     ""
-  ].join("\n");
+  ]
+    .filter((line): line is string => line !== undefined)
+    .join("\n");
 }
 
 async function appendMarkdown(section: string, logPath = config.RESERVATION_LOG_PATH): Promise<void> {
@@ -112,6 +117,36 @@ function isReservationLogFollowUp(value: unknown): value is ReservationLogFollow
     typeof item.createdAt === "string" &&
     typeof item.transcript === "string"
   );
+}
+
+function formatReservationUpdates(updates: Partial<ReservationDetails> | undefined): string | undefined {
+  if (!updates) return undefined;
+  const parts = [
+    updates.guestName ? `guest name -> ${updates.guestName}` : undefined,
+    updates.partySize ? `party size -> ${updates.partySize}` : undefined,
+    updates.day ? `date -> ${updates.day}` : undefined,
+    updates.time ? `time -> ${updates.time}` : undefined,
+    updates.specialNotes ? `special notes -> ${updates.specialNotes}` : undefined
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join("; ") : undefined;
+}
+
+function mergeReservationUpdates(
+  reservation: ReservationDetails,
+  updates: Partial<ReservationDetails> | undefined
+): ReservationDetails {
+  if (!updates) return reservation;
+  const specialNotes =
+    updates.specialNotes && reservation.specialNotes
+      ? `${reservation.specialNotes}; ${updates.specialNotes}`
+      : updates.specialNotes ?? reservation.specialNotes;
+  return {
+    ...reservation,
+    ...Object.fromEntries(
+      Object.entries(updates).filter(([key, value]) => key !== "specialNotes" && typeof value === "string" && value.trim().length > 0)
+    ),
+    specialNotes
+  };
 }
 
 export function createReservationLogEntry(input: {
@@ -180,6 +215,7 @@ export async function findLatestReservationForCaller(
 export async function recordReservationTextFollowUp(input: {
   caller?: string;
   transcript?: string;
+  reservationUpdates?: Partial<ReservationDetails>;
   createdAt?: string;
   logPath?: string;
 }): Promise<ReservationLogFollowUp | undefined> {
@@ -191,7 +227,8 @@ export async function recordReservationTextFollowUp(input: {
     reservationId: latest.id,
     caller: input.caller,
     createdAt: input.createdAt ?? new Date().toISOString(),
-    transcript: input.transcript.trim()
+    transcript: input.transcript.trim(),
+    reservationUpdates: input.reservationUpdates
   };
   await appendReservationLogFollowUp(followUp, input.logPath);
   return followUp;
@@ -209,19 +246,29 @@ export async function formatReservationLogContextForCaller(
   const followUps = records
     .filter((record): record is { type: "follow-up"; followUp: ReservationLogFollowUp } => record.type === "follow-up")
     .map((record) => record.followUp)
-    .filter((followUp) => followUp.reservationId === latest.id)
-    .slice(-3);
+    .filter((followUp) => followUp.reservationId === latest.id);
+  const currentReservation = followUps.reduce(
+    (reservation, followUp) => mergeReservationUpdates(reservation, followUp.reservationUpdates),
+    latest.reservation
+  );
+  const recentFollowUps = followUps.slice(-3);
 
   return [
     "Reservation log context for this caller:",
     `Reservation ID: ${latest.id}`,
-    `Guest name: ${latest.reservation.guestName ?? "not provided"}`,
-    `Party size: ${latest.reservation.partySize ?? "not provided"}`,
-    `Date/time: ${[latest.reservation.day, latest.reservation.time].filter(Boolean).join(" at ") || "not provided"}`,
-    `Special notes: ${latest.reservation.specialNotes ?? "none"}`,
+    `Guest name: ${currentReservation.guestName ?? "not provided"}`,
+    `Party size: ${currentReservation.partySize ?? "not provided"}`,
+    `Date/time: ${[currentReservation.day, currentReservation.time].filter(Boolean).join(" at ") || "not provided"}`,
+    `Special notes: ${currentReservation.specialNotes ?? "none"}`,
     latest.conversationContext ? `Original context: ${latest.conversationContext}` : undefined,
-    followUps.length > 0
-      ? ["Recent text follow-ups:", ...followUps.map((followUp) => `- ${followUp.createdAt}: ${followUp.transcript}`)].join("\n")
+    recentFollowUps.length > 0
+      ? [
+          "Recent text follow-ups:",
+          ...recentFollowUps.map((followUp) => {
+            const updates = formatReservationUpdates(followUp.reservationUpdates);
+            return `- ${followUp.createdAt}: ${followUp.transcript}${updates ? ` (${updates})` : ""}`;
+          })
+        ].join("\n")
       : "Recent text follow-ups: none"
   ]
     .filter(Boolean)

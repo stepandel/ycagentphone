@@ -31,6 +31,31 @@ describe("server", () => {
     expect(response.body.response).toBe("Echo: What do you cost?");
   });
 
+  it("answers inbound SMS without voice streaming and passes text channel context", async () => {
+    const turns: unknown[] = [];
+    const app = createApp(async (turn) => {
+      turns.push(turn);
+      return `Text reply: ${turn.transcript}`;
+    });
+
+    const response = await postSigned(app, "/webhooks/agentphone", {
+      event: "message.received",
+      data: {
+        channel: "sms",
+        fromNumber: "+15551234567",
+        body: "Can we move the reservation to 7:30?"
+      }
+    }).expect(200);
+
+    expect(response.headers["content-type"]).toContain("application/json");
+    expect(response.body.message).toBe("Text reply: Can we move the reservation to 7:30?");
+    expect(turns[0]).toMatchObject({
+      caller: "+15551234567",
+      channel: "text",
+      transcript: "Can we move the reservation to 7:30?"
+    });
+  });
+
   it("passes call-start webhooks to the answer service", async () => {
     const app = createApp(async ({ isCallStart }) => (isCallStart ? "Good evening, and thank you for calling." : "Later."));
 

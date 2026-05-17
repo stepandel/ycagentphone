@@ -14,6 +14,7 @@ export type AnswerOptions = {
   isCallStart?: boolean;
   callId?: string;
   caller?: string;
+  channel?: "voice" | "text";
 };
 
 export type AnswerResult = string | VoiceAnswer;
@@ -42,7 +43,7 @@ function getOpenAI(): OpenAI {
   return openai;
 }
 
-export const answerCaller: AnswerService = async ({ transcript, isCallStart, callId, caller }) => withAnswerTrace({ transcript, isCallStart, callId, caller }, async () => {
+export const answerCaller: AnswerService = async ({ transcript, isCallStart, callId, caller, channel = "voice" }) => withAnswerTrace({ transcript, isCallStart, callId, caller }, async () => {
   if (isCallStart || !transcript?.trim()) {
     return config.RESTAURANT_GREETING;
   }
@@ -63,6 +64,7 @@ export const answerCaller: AnswerService = async ({ transcript, isCallStart, cal
             text: [
               callId ? `Call ID: ${callId}` : undefined,
               caller ? `Caller: ${caller}` : undefined,
+              `Communication channel: ${channel}`,
               "Matched call skill context:",
               skillContext,
               "Existing reservation log:",

@@ -90,4 +90,30 @@ describe("reservation log", () => {
       "Actually can we make it 7:30 and add a high chair?"
     );
   });
+
+  it("applies structured text follow-up updates to the current reservation context", async () => {
+    const logPath = await tempLogPath();
+    await appendReservationLogEntry(
+      createReservationLogEntry({
+        callId: "call_123",
+        caller: "+15551234567",
+        createdAt: "2026-05-17T20:00:00.000Z",
+        reservation: { guestName: "Taylor", partySize: "4", day: "Friday", time: "7 PM", specialNotes: "birthday" }
+      }),
+      logPath
+    );
+
+    await recordReservationTextFollowUp({
+      caller: "+15551234567",
+      transcript: "Actually can we make it 7:30 and add a high chair?",
+      reservationUpdates: { time: "7:30", specialNotes: "add a high chair" },
+      createdAt: "2026-05-17T20:05:00.000Z",
+      logPath
+    });
+
+    const context = await formatReservationLogContextForCaller("+15551234567", logPath);
+    expect(context).toContain("Date/time: Friday at 7:30");
+    expect(context).toContain("Special notes: birthday; add a high chair");
+    expect(context).toContain("time -> 7:30");
+  });
 });

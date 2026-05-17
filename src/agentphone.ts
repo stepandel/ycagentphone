@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 export type CallTurn = {
   callId?: string;
   caller?: string;
+  channel?: "voice" | "text";
   transcript?: string;
   isCallStart: boolean;
   raw: unknown;
@@ -39,6 +40,14 @@ function firstString(...values: unknown[]): string | undefined {
       return value.trim();
     }
   }
+  return undefined;
+}
+
+function normalizeChannel(value: string | undefined): "voice" | "text" | undefined {
+  const channel = value?.toLowerCase();
+  if (!channel) return undefined;
+  if (channel === "sms" || channel === "text" || channel === "message") return "text";
+  if (channel === "voice" || channel === "call" || channel === "phone") return "voice";
   return undefined;
 }
 
@@ -83,9 +92,13 @@ function isCallStartPayload(body: UnknownRecord): boolean {
 
 export function extractCallTurn(payload: unknown): CallTurn {
   const body = asRecord(payload);
+  const data = asRecord(body.data);
   const call = asRecord(body.call);
   const caller = asRecord(body.caller);
+  const contact = asRecord(body.contact);
   const conversation = asRecord(body.conversation);
+  const message = asRecord(body.message);
+  const sms = asRecord(body.sms);
 
   const transcript =
     firstString(
@@ -95,9 +108,18 @@ export function extractCallTurn(payload: unknown): CallTurn {
       body.input,
       body.userInput,
       body.callerTranscript,
+      data.transcript,
+      data.text,
+      data.message,
+      data.body,
+      message.text,
+      message.body,
+      sms.text,
+      sms.body,
       call.transcript,
       conversation.transcript
     ) ??
+    transcriptFromMessages(data.messages) ??
     transcriptFromMessages(body.messages) ??
     transcriptFromMessages(conversation.messages) ??
     transcriptFromMessages(body.recentHistory);
@@ -108,8 +130,25 @@ export function extractCallTurn(payload: unknown): CallTurn {
   }
 
   return {
-    callId: firstString(body.callId, body.call_id, call.id, call.callId, conversation.id),
-    caller: firstString(body.from, body.phoneNumber, caller.phoneNumber, caller.number, call.from),
+    callId: firstString(body.callId, body.call_id, body.messageId, data.callId, data.call_id, data.messageId, call.id, call.callId, conversation.id),
+    caller: firstString(
+      body.from,
+      body.fromNumber,
+      body.phoneNumber,
+      data.from,
+      data.fromNumber,
+      data.phoneNumber,
+      caller.phoneNumber,
+      caller.number,
+      contact.phoneNumber,
+      contact.number,
+      message.from,
+      message.fromNumber,
+      sms.from,
+      sms.fromNumber,
+      call.from
+    ),
+    channel: normalizeChannel(firstString(body.channel, data.channel, message.channel, sms.channel)),
     isCallStart,
     transcript,
     raw: payload
