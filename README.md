@@ -103,6 +103,7 @@ ${AGENTPHONE_WEBHOOK_BASE_URL}/webhooks/agentphone
 ```
 
 It also updates `AGENTPHONE_WEBHOOK_SECRET` in `.env` with the returned AgentPhone signing secret.
+Restart the webhook server after running this command so signature verification uses the new secret.
 
 The webhook parser accepts several common payload shapes, including:
 

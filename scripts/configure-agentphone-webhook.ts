@@ -63,4 +63,5 @@ console.log(`Status: ${data.status}`);
 console.log(`Timeout: ${data.timeout}`);
 if (data.secret) {
   console.log("Updated AGENTPHONE_WEBHOOK_SECRET in .env.");
+  console.log("Restart the webhook server before running signed webhook tests or taking calls.");
 }
