@@ -51,6 +51,14 @@ The default container tag is `ycagentphone-restaurant-kb`. Override `SUPERMEMORY
 
 Langfuse tracing is enabled automatically when `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and `LANGFUSE_BASE_URL` are set. Each answered turn is traced as `agentphone.answer`, with Supermemory retrieval and the OpenAI Responses API call captured underneath it.
 
+Reservation notes can be captured to a local Markdown file by setting `RESERVATION_NOTES_PATH`, for example:
+
+```bash
+RESERVATION_NOTES_PATH=./data/reservation-notes.md bun src/server.ts
+```
+
+When enabled, webhook turns that match the reservation-taking skill are appended with call metadata, the caller transcript, and the agent response. Non-reservation turns and call-start greetings are skipped.
+
 ## Run Locally
 
 ```bash

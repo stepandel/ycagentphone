@@ -8,7 +8,7 @@
     "dev": "bun --watch src/server.ts",
     "start": "bun src/server.ts",
     "build": "tsc -p tsconfig.build.json",
-    "test": "bun test test/agentphone.test.ts test/server.test.ts test/reservations.test.ts",
+    "test": "bun test test/agentphone.test.ts test/server.test.ts test/reservations.test.ts test/reservation-notes.test.ts",
     "lint": "tsc -p tsconfig.json --noEmit",
     "configure:webhook": "bun scripts/configure-agentphone-webhook.ts",
     "ingest:kb": "bun scripts/ingest-kb.ts",
