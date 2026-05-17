@@ -25,7 +25,8 @@ export function initLangfuseTracing(): void {
         secretKey: config.LANGFUSE_SECRET_KEY,
         baseUrl: config.LANGFUSE_BASE_URL,
         environment: config.LANGFUSE_TRACING_ENVIRONMENT,
-        release: config.LANGFUSE_RELEASE
+        release: config.LANGFUSE_RELEASE,
+        exportMode: "immediate"
       })
     ]
   });
