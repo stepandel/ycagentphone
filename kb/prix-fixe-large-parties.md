@@ -3,16 +3,30 @@
 Audience: Caller-facing.
 Effective date: 2026-05-17
 
-Replace this file with approved prix fixe or family-style menu options for parties over 10 guests.
+Parties of more than 10 guests require a four-course prix fixe menu. Each course has three options.
 
-Include:
-- Menu names.
-- Guest count eligibility.
-- Price per person, if approved.
-- Number of courses.
-- Beverage pairing or open bar options, if applicable.
-- Dietary accommodation notes.
-- Children's menu or non-alcoholic options, if applicable.
+Course 1 choices:
+- Seasonal salad.
+- Roasted vegetable soup.
+- Tuna crudo.
 
-Current placeholder:
-- Prix fixe menu information has not been configured in this prototype knowledgebase.
+Course 2 choices:
+- Handmade pasta.
+- Grilled prawns.
+- Mushroom risotto.
+
+Course 3 choices:
+- Roasted chicken.
+- Seared fish.
+- Braised short rib.
+
+Course 4 choices:
+- Chocolate torte.
+- Citrus panna cotta.
+- Seasonal sorbet.
+
+Policy notes:
+- The current prototype does not include per-person prix fixe pricing.
+- A 20% mandatory gratuity applies to parties over 10.
+- A $100 deposit is required to guarantee the reservation.
+- Dietary restrictions and allergies should be noted and reviewed by the restaurant before final confirmation.

@@ -3,19 +3,32 @@
 Audience: Caller-facing.
 Effective date: 2026-05-17
 
-Replace this file with policies for parties over 10 guests.
+Large-party handling applies to parties of more than 10 guests.
 
-Include:
-- Minimum guest count for large party handling.
-- Inquiry versus confirmed reservation process.
-- Deposit or credit card hold requirements.
-- Cancellation and guest-count change deadlines.
-- Private dining room or buyout availability.
-- Seating preferences the restaurant can consider.
-- Whether a prix fixe menu is required.
-- Service charge, tax, gratuity, and beverage policy.
-- Typical response time for large party inquiries.
+Large-party status:
+- Parties of more than 10 guests are handled as an inquiry until the restaurant confirms the reservation.
+- Private rooms may be requested for larger parties, but room assignment is subject to manager confirmation.
+- The current prototype availability table includes private-room capacity by date and time.
 
-Current placeholder:
-- Large party policies have not been configured in this prototype knowledgebase.
-- The agent may collect a large party inquiry, but must not confirm a reservation.
+Required conditions for parties over 10:
+- A four-course prix fixe menu is required.
+- Each prix fixe course has three options.
+- A 20% mandatory gratuity applies.
+- A $100 deposit is required to guarantee the reservation.
+- The agent may explain the deposit requirement, but must not collect payment by phone unless a payment workflow exists.
+
+Large-party intake:
+- Occasion.
+- Number of guests.
+- Preferred date.
+- Preferred time or time range.
+- Seating preference, including indoor, outdoor, window, booth, or private room.
+- Allergies and dietary restrictions.
+- Accessibility needs.
+- Desired pacing or timetable, such as cocktails, seated dinner, speeches, cake, or after-dinner drinks.
+- Whether guests plan to bring their own wine or cake.
+- Contact name.
+- Contact phone number.
+- Contact email.
+
+The agent should ask questions one at a time, confirm the collected details, and say the restaurant will follow up to finalize the reservation and deposit.
