@@ -152,6 +152,22 @@ and:
 
 The JSON response includes `response`, `text`, and `message` fields with the same answer so it is easy to adapt to AgentPhone's exact expected response key. When the agent should end the call after speaking, the response also includes `hangup: true` and `action: "hangup"`.
 
+Inbound SMS/text webhooks can use the same endpoint. Send `channel: "sms"` or an AgentPhone message-style payload such as:
+
+```json
+{
+  "event": "message.received",
+  "data": {
+    "channel": "sms",
+    "messageId": "msg_123",
+    "fromNumber": "+15551234567",
+    "body": "Can we move the reservation to 7:30 and add a high chair?"
+  }
+}
+```
+
+Text turns are answered with normal JSON instead of voice streaming. The agent receives the caller's latest reservation log context, can answer restaurant or reservation questions from the knowledgebase and log, and appends text follow-ups to the reservation history. Common change requests like time, date, party-size, and special-note updates are stored as reservation amendments so later text replies see the updated current reservation.
+
 For NDJSON-style streaming, call:
 
 ```text

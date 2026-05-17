@@ -68,6 +68,22 @@ describe("extractCallTurn", () => {
     });
   });
 
+  it("infers text channel from message events when channel is omitted", () => {
+    expect(
+      extractCallTurn({
+        event: "message.received",
+        data: {
+          messageId: "msg_123",
+          fromNumber: "+15551234567",
+          body: "What time is my reservation?"
+        }
+      })
+    ).toMatchObject({
+      channel: "text",
+      transcript: "What time is my reservation?"
+    });
+  });
+
   it("marks payloads without transcript text as call starts", () => {
     expect(
       extractCallTurn({

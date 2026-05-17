@@ -51,6 +51,15 @@ function normalizeChannel(value: string | undefined): "voice" | "text" | undefin
   return undefined;
 }
 
+function inferChannel(body: UnknownRecord, data: UnknownRecord, message: UnknownRecord, sms: UnknownRecord): "voice" | "text" | undefined {
+  const explicit = normalizeChannel(firstString(body.channel, data.channel, message.channel, sms.channel));
+  if (explicit) return explicit;
+
+  const event = firstString(body.event, body.type, data.event, data.type)?.toLowerCase();
+  if (event?.startsWith("message.") || event?.includes("sms")) return "text";
+  return undefined;
+}
+
 function transcriptFromMessages(messages: unknown): string | undefined {
   const turns = transcriptTurnsFromMessages(messages);
   return turns.length > 0 ? turns.map((turn) => `${turn.role}: ${turn.content}`).join("\n") : undefined;
@@ -148,7 +157,7 @@ export function extractCallTurn(payload: unknown): CallTurn {
       sms.fromNumber,
       call.from
     ),
-    channel: normalizeChannel(firstString(body.channel, data.channel, message.channel, sms.channel)),
+    channel: inferChannel(body, data, message, sms),
     isCallStart,
     transcript,
     raw: payload
