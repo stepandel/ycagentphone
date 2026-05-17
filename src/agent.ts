@@ -4,7 +4,8 @@ import { formatKnowledgeSnippets, searchKnowledgebase } from "./memory.js";
 import { buildSystemPrompt } from "./prompt.js";
 
 export type AnswerOptions = {
-  transcript: string;
+  transcript?: string;
+  isCallStart?: boolean;
   callId?: string;
   caller?: string;
 };
@@ -25,7 +26,11 @@ function getOpenAI(): OpenAI {
   return openai;
 }
 
-export const answerCaller: AnswerService = async ({ transcript, callId, caller }) => {
+export const answerCaller: AnswerService = async ({ transcript, isCallStart, callId, caller }) => {
+  if (isCallStart || !transcript?.trim()) {
+    return config.RESTAURANT_GREETING;
+  }
+
   const knowledge = await searchKnowledgebase(transcript);
 
   const response = await getOpenAI().responses.create({

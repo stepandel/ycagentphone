@@ -3,7 +3,8 @@ import crypto from "node:crypto";
 export type CallTurn = {
   callId?: string;
   caller?: string;
-  transcript: string;
+  transcript?: string;
+  isCallStart: boolean;
   raw: unknown;
 };
 
@@ -41,6 +42,15 @@ function transcriptFromMessages(messages: unknown): string | undefined {
   return lines.length > 0 ? lines.join("\n") : undefined;
 }
 
+function isCallStartPayload(body: UnknownRecord): boolean {
+  const event = firstString(body.event, body.type, body.status)?.toLowerCase();
+  if (event?.includes("start") || event?.includes("initiated") || event?.includes("ringing")) {
+    return true;
+  }
+
+  return Object.keys(asRecord(body.call)).length > 0 || Object.keys(asRecord(body.conversation)).length > 0;
+}
+
 export function extractCallTurn(payload: unknown): CallTurn {
   const body = asRecord(payload);
   const call = asRecord(body.call);
@@ -61,14 +71,16 @@ export function extractCallTurn(payload: unknown): CallTurn {
     transcriptFromMessages(body.messages) ??
     transcriptFromMessages(conversation.messages) ??
     transcriptFromMessages(body.recentHistory);
+  const isCallStart = !transcript && isCallStartPayload(body);
 
-  if (!transcript) {
+  if (!transcript && !isCallStart) {
     throw new Error("No caller transcript found in webhook payload.");
   }
 
   return {
     callId: firstString(body.callId, body.call_id, call.id, call.callId, conversation.id),
     caller: firstString(body.from, body.phoneNumber, caller.phoneNumber, caller.number, call.from),
+    isCallStart,
     transcript,
     raw: payload
   };

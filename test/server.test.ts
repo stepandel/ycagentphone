@@ -31,6 +31,14 @@ describe("server", () => {
     expect(response.body.response).toBe("Echo: What do you cost?");
   });
 
+  it("passes call-start webhooks to the answer service", async () => {
+    const app = createApp(async ({ isCallStart }) => (isCallStart ? "Good evening, and thank you for calling." : "Later."));
+
+    const response = await postSigned(app, "/webhooks/agentphone", { event: "call.started" }).expect(200);
+
+    expect(response.body.response).toBe("Good evening, and thank you for calling.");
+  });
+
   it("returns ndjson for streaming requests", async () => {
     const app = createApp(async () => "The answer.");
 

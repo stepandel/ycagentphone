@@ -46,6 +46,23 @@ describe("extractCallTurn", () => {
       }).transcript
     ).toContain("caller: What do you cost?");
   });
+
+  it("marks payloads without transcript text as call starts", () => {
+    expect(
+      extractCallTurn({
+        call: { id: "call_123", from: "+15551234567" },
+        event: "call.started"
+      })
+    ).toMatchObject({
+      callId: "call_123",
+      caller: "+15551234567",
+      isCallStart: true
+    });
+  });
+
+  it("rejects payloads without transcript or call context", () => {
+    expect(() => extractCallTurn({ event: "agent.message" })).toThrow("No caller transcript");
+  });
 });
 
 describe("verifyAgentPhoneSignature", () => {
