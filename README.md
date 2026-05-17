@@ -19,7 +19,7 @@ Codex is useful as the builder and maintenance harness. The live call path is th
 
 ```bash
 cd ~/Development/ycagentphone
-npm install
+bun install
 cp .env.example .env
 ```
 
@@ -34,7 +34,7 @@ PUBLIC_CONTACT_EMAIL=...
 Then seed the hosted knowledgebase:
 
 ```bash
-npm run ingest:kb
+bun run ingest:kb
 ```
 
 Copy the printed `OPENAI_VECTOR_STORE_ID` into `.env`.
@@ -42,7 +42,7 @@ Copy the printed `OPENAI_VECTOR_STORE_ID` into `.env`.
 ## Run Locally
 
 ```bash
-npm run dev
+bun run dev
 ```
 
 Health check:
@@ -62,7 +62,7 @@ curl -X POST http://localhost:3000/test/turn \
 Local turn test through the script:
 
 ```bash
-npm run test:turn -- "What do you cost?"
+bun run test:turn -- "What do you cost?"
 ```
 
 ## AgentPhone Webhook
@@ -126,7 +126,7 @@ Recommended files:
 After editing the knowledgebase, run:
 
 ```bash
-npm run ingest:kb
+bun run ingest:kb
 ```
 
 ## Notes
