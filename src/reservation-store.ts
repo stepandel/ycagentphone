@@ -694,6 +694,77 @@ export function getReservation(db: Database, id: string): Reservation {
   };
 }
 
+export type ListReservationsOptions = {
+  from?: string | Date;
+  to?: string | Date;
+  status?: ReservationStatus[];
+  limit?: number;
+};
+
+export function listReservations(db: Database, options: ListReservationsOptions = {}): Reservation[] {
+  const conditions: string[] = [];
+  const params: (string | number)[] = [];
+
+  if (options.from) {
+    conditions.push("r.ends_at >= ?");
+    params.push(isoDateTime(options.from));
+  }
+  if (options.to) {
+    conditions.push("r.starts_at < ?");
+    params.push(isoDateTime(options.to));
+  }
+  if (options.status && options.status.length > 0) {
+    conditions.push(`r.status IN (${options.status.map(() => "?").join(", ")})`);
+    params.push(...options.status);
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const limit = options.limit ? "LIMIT ?" : "";
+  if (options.limit) params.push(parsePositiveInteger(options.limit, "Limit"));
+
+  const rows = db
+    .query<ReservationRow, (string | number)[]>(`SELECT r.* FROM reservations r ${where} ORDER BY r.starts_at ASC, r.guest_name ASC ${limit}`)
+    .all(...params);
+
+  if (rows.length === 0) return [];
+
+  const tableMap = new Map<string, number[]>();
+  const ids = rows.map((row) => row.id);
+  const placeholders = ids.map(() => "?").join(", ");
+  const tableRows = db
+    .query<{ reservation_id: string; table_id: number }, string[]>(
+      `SELECT reservation_id, table_id FROM reservation_tables WHERE reservation_id IN (${placeholders}) ORDER BY table_id`
+    )
+    .all(...ids);
+  for (const item of tableRows) {
+    const existing = tableMap.get(item.reservation_id) ?? [];
+    existing.push(item.table_id);
+    tableMap.set(item.reservation_id, existing);
+  }
+
+  return rows.map((row) => ({
+    id: row.id,
+    sourceCallId: row.source_call_id ?? undefined,
+    guestName: row.guest_name,
+    phone: row.phone ?? undefined,
+    partySize: row.party_size,
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+    durationMinutes: row.duration_minutes,
+    status: row.status,
+    notes: row.notes ?? undefined,
+    depositAmountCents: row.deposit_amount_cents ?? undefined,
+    depositCurrency: row.deposit_currency ?? undefined,
+    depositPaymentLinkUrl: row.deposit_payment_link_url ?? undefined,
+    depositStatus: row.deposit_status,
+    depositPaidAt: row.deposit_paid_at ?? undefined,
+    stripeCheckoutSessionId: row.stripe_checkout_session_id ?? undefined,
+    stripePaymentIntentId: row.stripe_payment_intent_id ?? undefined,
+    stripePaymentLinkId: row.stripe_payment_link_id ?? undefined,
+    tableIds: tableMap.get(row.id) ?? []
+  }));
+}
+
 export function findLatestReservationByPhone(db: Database, phone: string): Reservation | undefined {
   const row = db
     .query<{ id: string }, [string]>(

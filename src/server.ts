@@ -1,5 +1,6 @@
 import express, { type Request } from "express";
 import { config } from "./config.js";
+import { renderAdminPage } from "./admin-page.js";
 import { answerCaller, type AnswerResult, type AnswerService } from "./agent.js";
 import {
   extractCallTurn,
@@ -10,6 +11,12 @@ import {
 } from "./agentphone.js";
 import { createPostCallService, type PostCallService } from "./post-call.js";
 import { recordReservationTextFollowUp } from "./reservation-log.js";
+import {
+  listDiningTables,
+  listReservations,
+  openReservationDatabase,
+  seedDiningTables
+} from "./reservation-store.js";
 import { extractReservationUpdatesFromText } from "./reservation-text.js";
 import { initLangfuseTracing, shutdownLangfuseTracing } from "./tracing.js";
 
@@ -73,6 +80,27 @@ export function createApp(answerService: AnswerService = answerCaller, postCallS
 
   app.get("/health", (_req, res) => {
     res.json({ ok: true });
+  });
+
+  app.get("/admin", (_req, res) => {
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(renderAdminPage({ restaurantName: config.COMPANY_NAME, timeZone: config.RESTAURANT_TIME_ZONE }));
+  });
+
+  app.get("/admin/api/reservations", (_req, res) => {
+    const db = openReservationDatabase();
+    try {
+      seedDiningTables(db);
+      const reservations = listReservations(db);
+      const tables = listDiningTables(db);
+      res.json({ reservations, tables, timeZone: config.RESTAURANT_TIME_ZONE });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to load reservations.";
+      console.error(message);
+      res.status(500).json({ error: message });
+    } finally {
+      db.close();
+    }
   });
 
   app.post("/webhooks/agentphone", async (req: RawBodyRequest, res) => {
