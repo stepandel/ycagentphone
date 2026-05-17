@@ -9,9 +9,18 @@ Rules for the agent:
 - Only describe menu items, prices, and ingredients from this file or other approved menu files.
 - If a caller asks whether an item is available today, say availability may vary and offer to connect them with the restaurant or collect their contact information for follow-up.
 - Do not invent off-menu items, ingredients, preparation details, or prices.
-- "MP" means market price; tell callers market-price items can change and should be confirmed with the restaurant.
+- "MP" means market price. If a daily market price is listed in the section below, use that dated price. If the caller asks outside the listed date, say the item is market price and offer to collect the caller's information for follow-up.
 - The menu notes a 4% surcharge is applied to the bill to help offset employee benefit costs.
 - The menu advises that consuming raw or undercooked seafood or shellfish may increase the risk of food-borne illness.
+
+## Daily Market Prices
+
+Audience note: These are operator-provided daily market prices for Sunday, May 17, 2026 only. The official printed menu marks these items as MP, so do not carry these prices forward to another date unless this file is updated.
+
+- Cold cracked Dungeness crab: half $31.95; whole $58.95.
+- Richie's marinated cold cracked Dungeness crab: half $33.95; whole $62.95.
+- Whole crab Diavolo over linguine: $58.95.
+- Half crab Diavolo over linguine: $34.95.
 
 ## Appetizers and Raw Bar
 
