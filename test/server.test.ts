@@ -49,6 +49,18 @@ describe("server", () => {
     expect(response.text).toContain('"text":"The answer."');
   });
 
+  it("passes hangup controls through normal webhook responses", async () => {
+    const app = createApp(async () => ({ text: "Thanks for calling. Goodbye.", hangup: true }));
+
+    const response = await postSigned(app, "/webhooks/agentphone", { transcript: "Thanks, bye." }).expect(200);
+
+    expect(response.body).toMatchObject({
+      text: "Thanks for calling. Goodbye.",
+      hangup: true,
+      action: "hangup"
+    });
+  });
+
   it("streams an interim response before slow voice answers", async () => {
     let answerStarted = false;
     const app = createApp(
@@ -72,6 +84,23 @@ describe("server", () => {
       { text: "Of course. Let me check that for you.", interim: true },
       { text: "The answer." }
     ]);
+  });
+
+  it("passes hangup controls through voice streaming responses", async () => {
+    const app = createApp(async () => ({ text: "Thanks for calling. Goodbye.", hangup: true }));
+
+    const response = await postSigned(app, "/webhooks/agentphone", {
+      channel: "voice",
+      event: "agent.message",
+      transcript: "That is all, thanks."
+    }).expect(200);
+
+    const lines = response.text.trim().split("\n").map((line) => JSON.parse(line));
+    expect(lines[1]).toEqual({
+      text: "Thanks for calling. Goodbye.",
+      hangup: true,
+      action: "hangup"
+    });
   });
 
   it("handles post-call webhooks and sends reservation follow-up details", async () => {

@@ -22,6 +22,11 @@ export type PostCallWebhook = {
   raw: unknown;
 };
 
+export type VoiceAnswer = {
+  text: string;
+  hangup?: boolean;
+};
+
 type UnknownRecord = Record<string, unknown>;
 
 function asRecord(value: unknown): UnknownRecord {
@@ -178,11 +183,17 @@ function timingSafeEqual(expected: string, provided: string): boolean {
   return crypto.timingSafeEqual(expectedBuffer, providedBuffer);
 }
 
-export function formatAgentPhoneResponse(answer: string): UnknownRecord {
+function normalizeVoiceAnswer(answer: string | VoiceAnswer): VoiceAnswer {
+  return typeof answer === "string" ? { text: answer } : answer;
+}
+
+export function formatAgentPhoneResponse(answer: string | VoiceAnswer): UnknownRecord {
+  const voiceAnswer = normalizeVoiceAnswer(answer);
   return {
-    response: answer,
-    text: answer,
-    message: answer
+    response: voiceAnswer.text,
+    text: voiceAnswer.text,
+    message: voiceAnswer.text,
+    ...(voiceAnswer.hangup ? { hangup: true, action: "hangup" } : {})
   };
 }
 
@@ -190,10 +201,14 @@ export function formatAgentPhoneNdjson(answer: string): string {
   return formatAgentPhoneStreamingResponse("Let me check that.", answer);
 }
 
-export function formatAgentPhoneStreamingResponse(interim: string, answer: string): string {
+export function formatAgentPhoneStreamingResponse(interim: string, answer: string | VoiceAnswer): string {
+  const voiceAnswer = normalizeVoiceAnswer(answer);
   return [
     JSON.stringify({ text: interim, interim: true }),
-    JSON.stringify({ text: answer })
+    JSON.stringify({
+      text: voiceAnswer.text,
+      ...(voiceAnswer.hangup ? { hangup: true, action: "hangup" } : {})
+    })
   ].join("\n");
 }
 

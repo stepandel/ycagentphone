@@ -4,6 +4,9 @@ import { formatKnowledgeSnippets, searchKnowledgebase } from "./memory.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { buildSkillContext } from "./skills/index.js";
 import { observeOpenAIForTurn, withAnswerTrace, withKnowledgeRetrievalTrace } from "./tracing.js";
+import type { VoiceAnswer } from "./agentphone.js";
+
+const END_CALL_MARKER = "[[END_CALL]]";
 
 export type AnswerOptions = {
   transcript?: string;
@@ -12,9 +15,19 @@ export type AnswerOptions = {
   caller?: string;
 };
 
-export type AnswerService = (options: AnswerOptions) => Promise<string>;
+export type AnswerResult = string | VoiceAnswer;
+
+export type AnswerService = (options: AnswerOptions) => Promise<AnswerResult>;
 
 let openai: OpenAI | undefined;
+
+function parseAnswerControl(text: string): VoiceAnswer {
+  const hangup = text.includes(END_CALL_MARKER);
+  return {
+    text: text.replaceAll(END_CALL_MARKER, "").trim(),
+    ...(hangup ? { hangup: true } : {})
+  };
+}
 
 function getOpenAI(): OpenAI {
   if (!config.OPENAI_API_KEY) {
@@ -63,5 +76,5 @@ export const answerCaller: AnswerService = async ({ transcript, isCallStart, cal
     ]
   });
 
-  return response.output_text.trim();
+  return parseAnswerControl(response.output_text.trim());
 });

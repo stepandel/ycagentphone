@@ -148,7 +148,7 @@ and:
 }
 ```
 
-The JSON response includes `response`, `text`, and `message` fields with the same answer so it is easy to adapt to AgentPhone's exact expected response key.
+The JSON response includes `response`, `text`, and `message` fields with the same answer so it is easy to adapt to AgentPhone's exact expected response key. When the agent should end the call after speaking, the response also includes `hangup: true` and `action: "hangup"`.
 
 For NDJSON-style streaming, call:
 

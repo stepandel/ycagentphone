@@ -138,6 +138,16 @@ describe("formatAgentPhoneResponse", () => {
       message: "Hello"
     });
   });
+
+  it("includes AgentPhone hangup controls when requested", () => {
+    expect(formatAgentPhoneResponse({ text: "Thanks for calling. Goodbye.", hangup: true })).toEqual({
+      response: "Thanks for calling. Goodbye.",
+      text: "Thanks for calling. Goodbye.",
+      message: "Thanks for calling. Goodbye.",
+      hangup: true,
+      action: "hangup"
+    });
+  });
 });
 
 describe("sendAgentPhoneMessage", () => {

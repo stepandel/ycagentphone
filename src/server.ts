@@ -1,6 +1,6 @@
 import express, { type Request } from "express";
 import { config } from "./config.js";
-import { answerCaller, type AnswerService } from "./agent.js";
+import { answerCaller, type AnswerResult, type AnswerService } from "./agent.js";
 import {
   extractCallTurn,
   extractPostCallWebhook,
@@ -19,6 +19,19 @@ function bodyChannel(body: unknown): string | undefined {
   if (typeof body !== "object" || body === null) return undefined;
   const channel = (body as Record<string, unknown>).channel;
   return typeof channel === "string" ? channel.toLowerCase() : undefined;
+}
+
+function answerText(answer: AnswerResult): string {
+  return typeof answer === "string" ? answer : answer.text;
+}
+
+function answerChunk(answer: AnswerResult) {
+  return typeof answer === "string"
+    ? { text: answer }
+    : {
+        text: answer.text,
+        ...(answer.hangup ? { hangup: true, action: "hangup" } : {})
+      };
 }
 
 export function createApp(answerService: AnswerService = answerCaller, postCallService: PostCallService = createPostCallService()) {
@@ -82,7 +95,7 @@ export function createApp(answerService: AnswerService = answerCaller, postCallS
       res.write(`${JSON.stringify({ text: config.RESTAURANT_PROCESSING_MESSAGE, interim: true })}\n`);
       try {
         const answer = await answerService(turn);
-        res.write(`${JSON.stringify({ text: answer })}\n`);
+        res.write(`${JSON.stringify(answerChunk(answer))}\n`);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown webhook error.";
         console.error(message);
@@ -92,7 +105,7 @@ export function createApp(answerService: AnswerService = answerCaller, postCallS
       return;
     }
 
-    let answer = "";
+    let answer: AnswerResult = "";
     try {
       answer = await answerService(turn);
     } catch (error) {
@@ -119,7 +132,7 @@ export function createApp(answerService: AnswerService = answerCaller, postCallS
     }
 
     const answer = await answerService({ transcript });
-    res.json({ answer });
+    res.json({ answer: answerText(answer) });
   });
 
   return app;
