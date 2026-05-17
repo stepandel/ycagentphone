@@ -10,7 +10,7 @@ const envSchema = z.object({
   OPENAI_API_KEY: optionalNonEmptyString,
   OPENAI_MODEL: z.string().default("gpt-4.1-mini"),
   SUPERMEMORY_API_KEY: optionalNonEmptyString,
-  SUPERMEMORY_CONTAINER_TAG: z.string().min(1).default("ycagentphone-kb"),
+  SUPERMEMORY_CONTAINER_TAG: z.string().min(1).default("ycagentphone-restaurant-kb"),
   SUPERMEMORY_SEARCH_LIMIT: z.coerce.number().int().positive().default(8),
   SUPERMEMORY_SEARCH_MODE: z.enum(["memories", "hybrid", "documents"]).default("hybrid"),
   AGENTPHONE_WEBHOOK_SECRET: optionalNonEmptyString,

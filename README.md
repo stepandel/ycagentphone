@@ -39,7 +39,7 @@ Then seed the Supermemory knowledgebase:
 bun run ingest:kb
 ```
 
-The default container tag is `ycagentphone-kb`. Override `SUPERMEMORY_CONTAINER_TAG` in `.env` if you want to use a different memory space.
+The default container tag is `ycagentphone-restaurant-kb`. Override `SUPERMEMORY_CONTAINER_TAG` in `.env` if you want to use a different memory space.
 
 ## Run Locally
 

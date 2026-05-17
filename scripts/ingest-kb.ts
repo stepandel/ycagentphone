@@ -6,7 +6,7 @@ import Supermemory from "supermemory";
 const supermemory = new Supermemory({ apiKey: process.env.SUPERMEMORY_API_KEY });
 const root = process.cwd();
 const kbDir = path.join(root, "kb");
-const containerTag = process.env.SUPERMEMORY_CONTAINER_TAG || "ycagentphone-kb";
+const containerTag = process.env.SUPERMEMORY_CONTAINER_TAG || "ycagentphone-restaurant-kb";
 
 function customIdForPath(relativePath: string): string {
   const parsed = path.parse(relativePath);
