@@ -113,7 +113,7 @@ export async function withKnowledgeRetrievalTrace<T extends KnowledgeSnippet[]>(
   if (!isLangfuseTracingEnabled()) return fn();
 
   return startActiveObservation(
-    "supermemory.search",
+    "moss.search",
     async (observation) => {
       observation.update({ input: { query } });
 
@@ -122,9 +122,9 @@ export async function withKnowledgeRetrievalTrace<T extends KnowledgeSnippet[]>(
         observation.update({
           output: results,
           metadata: {
-            containerTag: config.SUPERMEMORY_CONTAINER_TAG,
-            searchMode: config.SUPERMEMORY_SEARCH_MODE,
-            limit: config.SUPERMEMORY_SEARCH_LIMIT
+            indexName: config.MOSS_INDEX_NAME,
+            alpha: config.MOSS_SEARCH_ALPHA,
+            limit: config.MOSS_SEARCH_LIMIT
           }
         });
         return results;

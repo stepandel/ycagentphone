@@ -1,4 +1,4 @@
-import Supermemory from "supermemory";
+import { MossClient } from "@moss-dev/moss";
 import { config } from "./config.js";
 
 export type KnowledgeSnippet = {
@@ -7,34 +7,47 @@ export type KnowledgeSnippet = {
   score?: number;
 };
 
-let supermemory: Supermemory | undefined;
+let moss: MossClient | undefined;
+let loadedIndex: Promise<string> | undefined;
 
-function getSupermemory(): Supermemory {
-  if (!config.SUPERMEMORY_API_KEY) {
-    throw new Error("SUPERMEMORY_API_KEY is required to search the knowledgebase.");
+function getMoss(): MossClient {
+  if (!config.MOSS_PROJECT_ID || !config.MOSS_PROJECT_KEY) {
+    throw new Error("MOSS_PROJECT_ID and MOSS_PROJECT_KEY are required to search the knowledgebase.");
   }
 
-  supermemory ??= new Supermemory({
-    apiKey: config.SUPERMEMORY_API_KEY
+  moss ??= new MossClient(config.MOSS_PROJECT_ID, config.MOSS_PROJECT_KEY);
+
+  return moss;
+}
+
+async function loadKnowledgeIndex(): Promise<string> {
+  loadedIndex ??= getMoss().loadIndex(config.MOSS_INDEX_NAME, {
+    autoRefresh: config.MOSS_AUTO_REFRESH,
+    pollingIntervalInSeconds: config.MOSS_AUTO_REFRESH_INTERVAL_SECONDS,
+    ...(config.MOSS_CACHE_PATH ? { cachePath: config.MOSS_CACHE_PATH } : {})
   });
 
-  return supermemory;
+  try {
+    return await loadedIndex;
+  } catch (error) {
+    loadedIndex = undefined;
+    throw error;
+  }
 }
 
 export async function searchKnowledgebase(query: string): Promise<KnowledgeSnippet[]> {
-  const results = await getSupermemory().search.memories({
-    q: query,
-    containerTag: config.SUPERMEMORY_CONTAINER_TAG,
-    searchMode: config.SUPERMEMORY_SEARCH_MODE,
-    limit: config.SUPERMEMORY_SEARCH_LIMIT,
-    rerank: true
+  await loadKnowledgeIndex();
+
+  const results = await getMoss().query(config.MOSS_INDEX_NAME, query, {
+    topK: config.MOSS_SEARCH_LIMIT,
+    alpha: config.MOSS_SEARCH_ALPHA
   });
 
-  return results.results
+  return results.docs
     .map((result) => ({
-      content: result.memory ?? result.chunk ?? result.chunks?.map((chunk) => chunk.content).join("\n\n") ?? "",
-      source: typeof result.metadata?.source === "string" ? result.metadata.source : undefined,
-      score: result.similarity
+      content: result.text,
+      source: result.metadata?.source,
+      score: result.score
     }))
     .filter((snippet) => snippet.content.trim().length > 0);
 }

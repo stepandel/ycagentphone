@@ -1,6 +1,6 @@
 # ycagentphone
 
-Prototype restaurant phone Q&A agent for AgentPhone webhooks backed by a Supermemory knowledgebase.
+Prototype restaurant phone Q&A agent for AgentPhone webhooks backed by a Moss knowledgebase.
 
 ## Architecture
 
@@ -10,7 +10,7 @@ Caller
   -> AgentPhone webhook
   -> Express service
   -> Call skill matching
-  -> Supermemory search
+  -> Moss search
   -> OpenAI Responses API
   -> AgentPhone speaks the answer
 ```
@@ -31,7 +31,9 @@ Edit `.env` and set:
 OPENAI_API_KEY=...
 LANGFUSE_PUBLIC_KEY=...
 LANGFUSE_SECRET_KEY=...
-SUPERMEMORY_API_KEY=...
+MOSS_PROJECT_ID=...
+MOSS_PROJECT_KEY=...
+MOSS_INDEX_NAME=ycagentphone-restaurant-kb
 AGENTPHONE_API_KEY=...
 AGENTPHONE_AGENT_ID=...
 AGENTPHONE_WEBHOOK_BASE_URL=...
@@ -41,15 +43,15 @@ RESTAURANT_PROCESSING_MESSAGE="Of course. Let me check that for you."
 PUBLIC_CONTACT_EMAIL=...
 ```
 
-Then seed the Supermemory knowledgebase:
+Then seed the Moss knowledgebase:
 
 ```bash
 bun run ingest:kb
 ```
 
-The default container tag is `ycagentphone-restaurant-kb`. Override `SUPERMEMORY_CONTAINER_TAG` in `.env` if you want to use a different memory space.
+The default Moss index is `ycagentphone-restaurant-kb`. Override `MOSS_INDEX_NAME` in `.env` if you want to use a different knowledge space. Retrieval uses hybrid search by default with `MOSS_SEARCH_ALPHA=0.8`, where `1.0` is semantic-only and `0.0` is keyword-only.
 
-Langfuse tracing is enabled automatically when `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and `LANGFUSE_BASE_URL` are set. Each answered turn is traced as `agentphone.answer`, with Supermemory retrieval and the OpenAI Responses API call captured underneath it.
+Langfuse tracing is enabled automatically when `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and `LANGFUSE_BASE_URL` are set. Each answered turn is traced as `agentphone.answer`, with Moss retrieval and the OpenAI Responses API call captured underneath it.
 
 Reservation notes can be captured as one Markdown file per call by setting `RESERVATION_NOTES_PATH` to a local directory, for example:
 
@@ -179,5 +181,5 @@ bun run ingest:kb
 - Call skills live in `src/skills/`. The reservation-taking flow is `src/skills/reservation-taking.ts`.
 - The webhook adapter lives in `src/agentphone.ts`.
 - The OpenAI call lives in `src/agent.ts`.
-- Supermemory retrieval lives in `src/memory.ts`.
+- Moss retrieval lives in `src/memory.ts`.
 - If AgentPhone provides a signing secret, set `AGENTPHONE_WEBHOOK_SECRET` and confirm the exact signature header/hash format in `src/agentphone.ts`.

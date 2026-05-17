@@ -8,11 +8,11 @@
         "@langfuse/openai": "^5.3.0",
         "@langfuse/otel": "^5.3.0",
         "@langfuse/tracing": "^5.3.0",
+        "@moss-dev/moss": "^1.0.2",
         "@opentelemetry/sdk-node": "^0.203.0",
         "dotenv": "^16.4.7",
         "express": "^4.21.2",
         "openai": "^4.104.0",
-        "supermemory": "^4.21.1",
         "zod": "^3.24.2",
       },
       "devDependencies": {
@@ -39,6 +39,20 @@
     "@langfuse/otel": ["@langfuse/otel@5.3.0", "", { "dependencies": { "@langfuse/core": "^5.3.0" }, "peerDependencies": { "@opentelemetry/api": "^1.9.0", "@opentelemetry/core": "^2.0.1", "@opentelemetry/exporter-trace-otlp-http": ">=0.202.0 <1.0.0", "@opentelemetry/sdk-trace-base": "^2.0.1" } }, "sha512-CJUz3oCD0RMbe+1cPxnuLD/JhsUnLt02DhLP6ZXzhFoi07rHsf8T5oUyCwLRNRH4x2tl87u3aTiOcBJqSK6/fQ=="],
 
     "@langfuse/tracing": ["@langfuse/tracing@5.3.0", "", { "dependencies": { "@langfuse/core": "^5.3.0" }, "peerDependencies": { "@opentelemetry/api": "^1.9.0" } }, "sha512-Fz6da1O+OqrwG69nF1UAjdaZrYUfR+h+DyVjXJLTNhTrOCqx/jTiIVAP5A32rB07+l4ESgzfO4K222A6cdPW1w=="],
+
+    "@moss-dev/moss": ["@moss-dev/moss@1.0.2", "", { "dependencies": { "@moss-dev/moss-core": "0.10.0" } }, "sha512-8qNlALaGaj8CzXe/RxNaYJnHQy1t1Qw7mGSLW9GCX2DfUFWjbXTPdfKSI8JQo07AazJT7EYlnS0pbT8/faJ32w=="],
+
+    "@moss-dev/moss-core": ["@moss-dev/moss-core@0.10.0", "", { "optionalDependencies": { "@moss-dev/moss-core-darwin-arm64": "0.10.0", "@moss-dev/moss-core-darwin-x64": "0.10.0", "@moss-dev/moss-core-linux-arm64-gnu": "0.10.0", "@moss-dev/moss-core-linux-x64-gnu": "0.10.0", "@moss-dev/moss-core-win32-x64-msvc": "0.10.0" } }, "sha512-tyiSYZRIShQq0t4i8Gr6ElctyG4VEIUom/b7GqOFcigEg4pBTgu+edSC1WyiamRl8OLhst3Z0TEX/k7SLSIh9w=="],
+
+    "@moss-dev/moss-core-darwin-arm64": ["@moss-dev/moss-core-darwin-arm64@0.10.0", "", { "os": "darwin", "cpu": "arm64" }, "sha512-kpAhK5q8IS58JjmjuOW/Nwcg24NqLY2qc0BJ9k7cGO2icb38aUkP5HeMZWBVfEsKOocmvD8p825vwOMQJ4FPDQ=="],
+
+    "@moss-dev/moss-core-darwin-x64": ["@moss-dev/moss-core-darwin-x64@0.10.0", "", { "os": "darwin", "cpu": "x64" }, "sha512-73Xdjri6ZvolzET6wsaj08rqTh+aP/RHHotTcEJ1e4kov/JTYtIgXsIeM5KWCqLMAeMH18FMREPw2oVCFgs7CA=="],
+
+    "@moss-dev/moss-core-linux-arm64-gnu": ["@moss-dev/moss-core-linux-arm64-gnu@0.10.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-WEc6JZhVQDdcj81FudiH3PLavSRyBXEeL5vnMeaReOVw0V8P7dDhFn27n0BWQOecbs/zuwBJXrWf8XKmwW1XPg=="],
+
+    "@moss-dev/moss-core-linux-x64-gnu": ["@moss-dev/moss-core-linux-x64-gnu@0.10.0", "", { "os": "linux", "cpu": "x64" }, "sha512-u1/anebVJPryphzGacc38DToDRl2nltMv9ElXtNLQ+uwEVjps6hhNa3/hvChp4BEIqysuWYd/PhpcMzxwbpppA=="],
+
+    "@moss-dev/moss-core-win32-x64-msvc": ["@moss-dev/moss-core-win32-x64-msvc@0.10.0", "", { "os": "win32", "cpu": "x64" }, "sha512-MLlRaX7B5XGP1OH64treKaUg3ZlXtdTxByzkLtI7qvO8VmuS6aLoSOOUHVpW9qTNfJrJCb8mAYfxCdSkBDaqVA=="],
 
     "@noble/hashes": ["@noble/hashes@1.8.0", "", {}, "sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A=="],
 
@@ -371,8 +385,6 @@
     "strip-ansi": ["strip-ansi@6.0.1", "", { "dependencies": { "ansi-regex": "^5.0.1" } }, "sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A=="],
 
     "superagent": ["superagent@10.3.0", "", { "dependencies": { "component-emitter": "^1.3.1", "cookiejar": "^2.1.4", "debug": "^4.3.7", "fast-safe-stringify": "^2.1.1", "form-data": "^4.0.5", "formidable": "^3.5.4", "methods": "^1.1.2", "mime": "2.6.0", "qs": "^6.14.1" } }, "sha512-B+4Ik7ROgVKrQsXTV0Jwp2u+PXYLSlqtDAhYnkkD+zn3yg8s/zjA2MeGayPoY/KICrbitwneDHrjSotxKL+0XQ=="],
-
-    "supermemory": ["supermemory@4.21.1", "", { "bin": { "supermemory": "bin/cli" } }, "sha512-KayOHtD94g7O+yN2qxaHEO5UIXtDl+duaKuhW7gvaraVtP1RHxFn80Pb5s5rKmqIvC+ruaARRlgMw7s/y+6LGQ=="],
 
     "supertest": ["supertest@7.2.2", "", { "dependencies": { "cookie-signature": "^1.2.2", "methods": "^1.1.2", "superagent": "^10.3.0" } }, "sha512-oK8WG9diS3DlhdUkcFn4tkNIiIbBx9lI2ClF8K+b2/m8Eyv47LSawxUzZQSNKUrVb2KsqeTDCcjAAVPYaSLVTA=="],
 
