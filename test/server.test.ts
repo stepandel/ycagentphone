@@ -73,4 +73,45 @@ describe("server", () => {
       { text: "The answer." }
     ]);
   });
+
+  it("handles post-call webhooks and sends reservation follow-up details", async () => {
+    const postCalls: unknown[] = [];
+    const app = createApp(
+      async () => "live answer",
+      async (call) => {
+        postCalls.push(call);
+        return {
+          sent: true,
+          message:
+            "Thanks for calling Your Restaurant. We noted your reservation details: Party size: 4; Day/time: Friday at 7 PM; Special notes: birthday."
+        };
+      }
+    );
+
+    const response = await postSigned(app, "/webhooks/agentphone", {
+      event: "agent.call_ended",
+      channel: "voice",
+      data: {
+        callId: "call_123",
+        from: "+15551234567",
+        transcript: [
+          { role: "caller", content: "Can I book a table for four Friday at 7?" },
+          { role: "agent", content: "I can note that request." },
+          { role: "caller", content: "Birthday dinner, please." }
+        ]
+      }
+    }).expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: true,
+      postCall: { sent: true }
+    });
+    expect(postCalls).toHaveLength(1);
+    expect(postCalls[0]).toMatchObject({
+      callId: "call_123",
+      caller: "+15551234567",
+      transcript:
+        "caller: Can I book a table for four Friday at 7?\nagent: I can note that request.\ncaller: Birthday dinner, please."
+    });
+  });
 });

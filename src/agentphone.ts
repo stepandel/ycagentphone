@@ -8,6 +8,20 @@ export type CallTurn = {
   raw: unknown;
 };
 
+export type TranscriptTurn = {
+  role: string;
+  content: string;
+};
+
+export type PostCallWebhook = {
+  callId?: string;
+  caller?: string;
+  numberId?: string;
+  transcript: string;
+  turns: TranscriptTurn[];
+  raw: unknown;
+};
+
 type UnknownRecord = Record<string, unknown>;
 
 function asRecord(value: unknown): UnknownRecord {
@@ -24,9 +38,14 @@ function firstString(...values: unknown[]): string | undefined {
 }
 
 function transcriptFromMessages(messages: unknown): string | undefined {
-  if (!Array.isArray(messages)) return undefined;
+  const turns = transcriptTurnsFromMessages(messages);
+  return turns.length > 0 ? turns.map((turn) => `${turn.role}: ${turn.content}`).join("\n") : undefined;
+}
 
-  const lines = messages
+function transcriptTurnsFromMessages(messages: unknown): TranscriptTurn[] {
+  if (!Array.isArray(messages)) return [];
+
+  return messages
     .map((message) => {
       const item = asRecord(message);
       const direction = firstString(item.direction);
@@ -34,12 +53,18 @@ function transcriptFromMessages(messages: unknown): string | undefined {
         firstString(item.role, item.speaker, item.from) ??
         (direction === "inbound" ? "caller" : direction === "outbound" ? "agent" : undefined) ??
         "caller";
-      const content = firstString(item.content, item.text, item.transcript, item.message);
-      return content ? `${role}: ${content}` : undefined;
+      const content = firstString(item.content, item.text, item.transcript, item.message, item.body);
+      return content ? { role, content } : undefined;
     })
-    .filter(Boolean);
+    .filter((turn): turn is TranscriptTurn => Boolean(turn));
+}
 
-  return lines.length > 0 ? lines.join("\n") : undefined;
+function firstTranscriptTurns(...values: unknown[]): TranscriptTurn[] {
+  for (const value of values) {
+    const turns = transcriptTurnsFromMessages(value);
+    if (turns.length > 0) return turns;
+  }
+  return [];
 }
 
 function isCallStartPayload(body: UnknownRecord): boolean {
@@ -82,6 +107,41 @@ export function extractCallTurn(payload: unknown): CallTurn {
     caller: firstString(body.from, body.phoneNumber, caller.phoneNumber, caller.number, call.from),
     isCallStart,
     transcript,
+    raw: payload
+  };
+}
+
+function isPostCallPayload(body: UnknownRecord): boolean {
+  const event = firstString(body.event, body.type)?.toLowerCase();
+  return event === "agent.call_ended" || event === "call.ended" || event === "call.completed";
+}
+
+export function extractPostCallWebhook(payload: unknown): PostCallWebhook {
+  const body = asRecord(payload);
+  if (!isPostCallPayload(body)) {
+    throw new Error("Webhook payload is not a post-call event.");
+  }
+
+  const data = asRecord(body.data);
+  const call = asRecord(body.call);
+  const caller = asRecord(body.caller);
+  const turns = firstTranscriptTurns(data.transcript, body.transcript, call.transcript);
+  const transcript =
+    transcriptFromMessages(data.transcript) ??
+    transcriptFromMessages(body.transcript) ??
+    transcriptFromMessages(call.transcript) ??
+    firstString(data.transcript, body.transcript, call.transcript);
+
+  if (!transcript) {
+    throw new Error("No post-call transcript found in webhook payload.");
+  }
+
+  return {
+    callId: firstString(data.callId, data.call_id, body.callId, body.call_id, call.id, call.callId),
+    caller: firstString(data.from, data.fromNumber, body.from, body.fromNumber, caller.phoneNumber, caller.number, call.from, call.fromNumber),
+    numberId: firstString(data.numberId, body.numberId, call.numberId),
+    transcript,
+    turns,
     raw: payload
   };
 }
@@ -135,4 +195,48 @@ export function formatAgentPhoneStreamingResponse(interim: string, answer: strin
     JSON.stringify({ text: interim, interim: true }),
     JSON.stringify({ text: answer })
   ].join("\n");
+}
+
+export type SendAgentPhoneMessageOptions = {
+  apiKey?: string;
+  agentId?: string;
+  baseUrl?: string;
+  toNumber: string;
+  body: string;
+  numberId?: string;
+  fetchFn?: (input: string, init: RequestInit) => Promise<Response>;
+};
+
+export async function sendAgentPhoneMessage({
+  apiKey,
+  agentId,
+  baseUrl = "https://api.agentphone.ai",
+  toNumber,
+  body,
+  numberId,
+  fetchFn = fetch
+}: SendAgentPhoneMessageOptions): Promise<unknown> {
+  if (!apiKey) throw new Error("AGENTPHONE_API_KEY is required to send post-call messages.");
+  if (!agentId) throw new Error("AGENTPHONE_AGENT_ID is required to send post-call messages.");
+
+  const response = await fetchFn(`${baseUrl.replace(/\/+$/, "")}/v1/messages`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      agent_id: agentId,
+      to_number: toNumber,
+      body,
+      ...(numberId ? { number_id: numberId } : {})
+    })
+  });
+
+  const responseText = await response.text();
+  if (!response.ok) {
+    throw new Error(`AgentPhone message send failed: ${response.status} ${response.statusText} ${responseText}`);
+  }
+
+  return responseText ? JSON.parse(responseText) : {};
 }

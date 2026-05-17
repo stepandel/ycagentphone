@@ -2,7 +2,9 @@ import crypto from "node:crypto";
 import { describe, expect, it } from "bun:test";
 import {
   extractCallTurn,
+  extractPostCallWebhook,
   formatAgentPhoneResponse,
+  sendAgentPhoneMessage,
   verifyAgentPhoneSignature
 } from "../src/agentphone.js";
 
@@ -65,6 +67,44 @@ describe("extractCallTurn", () => {
   });
 });
 
+describe("extractPostCallWebhook", () => {
+  it("extracts the full transcript and caller from call-ended payloads", () => {
+    expect(
+      extractPostCallWebhook({
+        event: "agent.call_ended",
+        channel: "voice",
+        data: {
+          callId: "call_123",
+          from: "+15551234567",
+          numberId: "num_123",
+          transcript: [
+            { role: "caller", content: "Can I book a table for four Friday at 7?" },
+            { role: "agent", content: "I can note that request." },
+            { role: "caller", content: "It is for a birthday, and we need a window table." }
+          ]
+        }
+      })
+    ).toMatchObject({
+      callId: "call_123",
+      caller: "+15551234567",
+      numberId: "num_123",
+      transcript:
+        "caller: Can I book a table for four Friday at 7?\nagent: I can note that request.\ncaller: It is for a birthday, and we need a window table.",
+      turns: [
+        { role: "caller", content: "Can I book a table for four Friday at 7?" },
+        { role: "agent", content: "I can note that request." },
+        { role: "caller", content: "It is for a birthday, and we need a window table." }
+      ]
+    });
+  });
+
+  it("rejects call-ended payloads without a transcript", () => {
+    expect(() => extractPostCallWebhook({ event: "agent.call_ended", channel: "voice", data: {} })).toThrow(
+      "No post-call transcript"
+    );
+  });
+});
+
 describe("verifyAgentPhoneSignature", () => {
   it("passes when no secret is configured", () => {
     expect(verifyAgentPhoneSignature(Buffer.from("{}"), undefined, undefined)).toBe(true);
@@ -96,6 +136,40 @@ describe("formatAgentPhoneResponse", () => {
       response: "Hello",
       text: "Hello",
       message: "Hello"
+    });
+  });
+});
+
+describe("sendAgentPhoneMessage", () => {
+  it("posts outbound messages to AgentPhone", async () => {
+    const requests: Array<{ url: string; init: RequestInit }> = [];
+    const fetchFn = async (url: string | URL | Request, init?: RequestInit) => {
+      requests.push({ url: String(url), init: init ?? {} });
+      return new Response(JSON.stringify({ id: "msg_123" }), { status: 200 });
+    };
+
+    await sendAgentPhoneMessage({
+      apiKey: "key",
+      agentId: "agent_123",
+      baseUrl: "https://api.agentphone.ai/",
+      toNumber: "+15551234567",
+      numberId: "num_123",
+      body: "Thanks for calling.",
+      fetchFn
+    });
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0].url).toBe("https://api.agentphone.ai/v1/messages");
+    expect(requests[0].init.method).toBe("POST");
+    expect(requests[0].init.headers).toMatchObject({
+      authorization: "Bearer key",
+      "content-type": "application/json"
+    });
+    expect(JSON.parse(String(requests[0].init.body))).toEqual({
+      agent_id: "agent_123",
+      to_number: "+15551234567",
+      number_id: "num_123",
+      body: "Thanks for calling."
     });
   });
 });

@@ -36,6 +36,7 @@ MOSS_PROJECT_KEY=...
 MOSS_INDEX_NAME=ycagentphone-restaurant-kb
 AGENTPHONE_API_KEY=...
 AGENTPHONE_AGENT_ID=...
+AGENTPHONE_BASE_URL=https://api.agentphone.ai
 AGENTPHONE_WEBHOOK_BASE_URL=...
 COMPANY_NAME=...
 RESTAURANT_GREETING="Good evening, and thank you for calling. This is the restaurant's virtual host. How may I help you today?"
@@ -142,6 +143,8 @@ For NDJSON-style streaming, call:
 ```text
 /webhooks/agentphone?stream=1
 ```
+
+Post-call webhooks use AgentPhone's `agent.call_ended` event. The service extracts the full transcript from `data.transcript`, summarizes reservation context with OpenAI, then sends a brief follow-up message to the caller with party size, day/time, and special notes. Outbound messaging requires `AGENTPHONE_API_KEY` and `AGENTPHONE_AGENT_ID`; `AGENTPHONE_BASE_URL` defaults to `https://api.agentphone.ai`.
 
 ## Knowledgebase
 

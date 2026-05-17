@@ -3,10 +3,12 @@ import { config } from "./config.js";
 import { answerCaller, type AnswerService } from "./agent.js";
 import {
   extractCallTurn,
+  extractPostCallWebhook,
   formatAgentPhoneResponse,
   formatAgentPhoneStreamingResponse,
   verifyAgentPhoneSignature
 } from "./agentphone.js";
+import { createPostCallService, type PostCallService } from "./post-call.js";
 import { initLangfuseTracing, shutdownLangfuseTracing } from "./tracing.js";
 
 type RawBodyRequest = Request & {
@@ -19,7 +21,7 @@ function bodyChannel(body: unknown): string | undefined {
   return typeof channel === "string" ? channel.toLowerCase() : undefined;
 }
 
-export function createApp(answerService: AnswerService = answerCaller) {
+export function createApp(answerService: AnswerService = answerCaller, postCallService: PostCallService = createPostCallService()) {
   const app = express();
 
   app.use(
@@ -43,6 +45,19 @@ export function createApp(answerService: AnswerService = answerCaller) {
 
     if (!verifyAgentPhoneSignature(req.rawBody ?? Buffer.from(""), signature, config.AGENTPHONE_WEBHOOK_SECRET, timestamp)) {
       res.status(401).json({ error: "Invalid webhook signature." });
+      return;
+    }
+
+    if (bodyChannel(req.body) === "voice" && typeof req.body?.event === "string" && req.body.event === "agent.call_ended") {
+      try {
+        const postCall = extractPostCallWebhook(req.body);
+        const result = await postCallService(postCall);
+        res.json({ ok: true, postCall: result });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown post-call webhook error.";
+        console.error(message);
+        res.status(400).json({ error: message });
+      }
       return;
     }
 
