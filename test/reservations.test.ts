@@ -25,6 +25,9 @@ describe("reservation-taking skill", () => {
     expect(context).toContain("$100 deposit");
     expect(context).toContain("BYOW is allowed");
     expect(context).toContain("Bring-your-own cake is allowed");
+    expect(context).toContain("Use this internal checklist");
+    expect(context).toContain("Required details: guest name, party size, preferred date");
+    expect(context).toContain("summarize the reservation request back to the guest");
   });
 
   it("keeps non-reservation turns concise", () => {

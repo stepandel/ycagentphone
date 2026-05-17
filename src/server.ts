@@ -7,7 +7,6 @@ import {
   formatAgentPhoneStreamingResponse,
   verifyAgentPhoneSignature
 } from "./agentphone.js";
-import { appendReservationNote } from "./reservation-notes.js";
 import { initLangfuseTracing, shutdownLangfuseTracing } from "./tracing.js";
 
 type RawBodyRequest = Request & {
@@ -18,15 +17,6 @@ function bodyChannel(body: unknown): string | undefined {
   if (typeof body !== "object" || body === null) return undefined;
   const channel = (body as Record<string, unknown>).channel;
   return typeof channel === "string" ? channel.toLowerCase() : undefined;
-}
-
-async function recordReservationNote(turn: ReturnType<typeof extractCallTurn>, answer: string): Promise<void> {
-  try {
-    await appendReservationNote({ ...turn, answer });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown reservation note error.";
-    console.error(`Failed to write reservation note: ${message}`);
-  }
 }
 
 export function createApp(answerService: AnswerService = answerCaller) {
@@ -77,7 +67,6 @@ export function createApp(answerService: AnswerService = answerCaller) {
       res.write(`${JSON.stringify({ text: config.RESTAURANT_PROCESSING_MESSAGE, interim: true })}\n`);
       try {
         const answer = await answerService(turn);
-        await recordReservationNote(turn, answer);
         res.write(`${JSON.stringify({ text: answer })}\n`);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown webhook error.";
@@ -91,7 +80,6 @@ export function createApp(answerService: AnswerService = answerCaller) {
     let answer = "";
     try {
       answer = await answerService(turn);
-      await recordReservationNote(turn, answer);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown webhook error.";
       console.error(message);
