@@ -219,6 +219,7 @@ export type SendAgentPhoneMessageOptions = {
   toNumber: string;
   body: string;
   numberId?: string;
+  logApi?: boolean;
   fetchFn?: (input: string, init: RequestInit) => Promise<Response>;
 };
 
@@ -229,26 +230,46 @@ export async function sendAgentPhoneMessage({
   toNumber,
   body,
   numberId,
+  logApi = false,
   fetchFn = fetch
 }: SendAgentPhoneMessageOptions): Promise<unknown> {
   if (!apiKey) throw new Error("AGENTPHONE_API_KEY is required to send post-call messages.");
   if (!agentId) throw new Error("AGENTPHONE_AGENT_ID is required to send post-call messages.");
 
-  const response = await fetchFn(`${baseUrl.replace(/\/+$/, "")}/v1/messages`, {
+  const url = `${baseUrl.replace(/\/+$/, "")}/v1/messages`;
+  const requestBody = {
+    agent_id: agentId,
+    to_number: toNumber,
+    body,
+    ...(numberId ? { number_id: numberId } : {})
+  };
+
+  if (logApi) {
+    console.log("AgentPhone API request", {
+      method: "POST",
+      url,
+      body: requestBody
+    });
+  }
+
+  const response = await fetchFn(url, {
     method: "POST",
     headers: {
       authorization: `Bearer ${apiKey}`,
       "content-type": "application/json"
     },
-    body: JSON.stringify({
-      agent_id: agentId,
-      to_number: toNumber,
-      body,
-      ...(numberId ? { number_id: numberId } : {})
-    })
+    body: JSON.stringify(requestBody)
   });
 
   const responseText = await response.text();
+  if (logApi) {
+    console.log("AgentPhone API response", {
+      status: response.status,
+      statusText: response.statusText,
+      body: responseText
+    });
+  }
+
   if (!response.ok) {
     throw new Error(`AgentPhone message send failed: ${response.status} ${response.statusText} ${responseText}`);
   }

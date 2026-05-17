@@ -17,12 +17,24 @@ async function findNumberId(phoneNumber: string): Promise<string> {
     throw new Error("AGENTPHONE_API_KEY is required to resolve the sender number.");
   }
 
-  const response = await fetch(`${agentPhoneBaseUrl.replace(/\/+$/, "")}/v1/numbers?limit=100`, {
+  const url = `${agentPhoneBaseUrl.replace(/\/+$/, "")}/v1/numbers?limit=100`;
+  console.log("AgentPhone API request", {
+    method: "GET",
+    url,
+    query: { limit: 100 }
+  });
+
+  const response = await fetch(url, {
     headers: {
       authorization: `Bearer ${process.env.AGENTPHONE_API_KEY}`
     }
   });
   const responseText = await response.text();
+  console.log("AgentPhone API response", {
+    status: response.status,
+    statusText: response.statusText,
+    body: responseText
+  });
 
   if (!response.ok) {
     throw new Error(`AgentPhone number lookup failed: ${response.status} ${response.statusText} ${responseText}`);
@@ -48,7 +60,8 @@ await sendAgentPhoneMessage({
   baseUrl: agentPhoneBaseUrl,
   toNumber,
   numberId,
-  body
+  body,
+  logApi: true
 });
 
 console.log(`Sent AgentPhone activation SMS to ${toNumber}${fromNumber ? ` from ${fromNumber}` : ""}.`);
