@@ -1,6 +1,6 @@
 # ycagentphone
 
-Prototype phone Q&A agent for AgentPhone webhooks backed by a Supermemory knowledgebase.
+Prototype restaurant phone Q&A agent for AgentPhone webhooks backed by a Supermemory knowledgebase.
 
 ## Architecture
 
@@ -58,19 +58,19 @@ Local turn test through HTTP:
 ```bash
 curl -X POST http://localhost:3000/test/turn \
   -H 'content-type: application/json' \
-  -d '{"transcript":"What do you cost?"}'
+  -d '{"transcript":"Do you have a private dining menu for 14 people?"}'
 ```
 
 Local turn test through the script:
 
 ```bash
-bun run test:turn -- "What do you cost?"
+bun run test:turn -- "Do you have gluten-free pasta?"
 ```
 
 Signed local webhook test:
 
 ```bash
-bun run test:webhook -- "What do you cost?"
+bun run test:webhook -- "Can I book a birthday dinner for 12 people?"
 ```
 
 ## AgentPhone Webhook
@@ -93,7 +93,7 @@ The webhook parser accepts several common payload shapes, including:
 {
   "callId": "call_123",
   "from": "+15551234567",
-  "transcript": "What do you cost?"
+  "transcript": "Can I book a birthday dinner for 12 people?"
 }
 ```
 
@@ -103,7 +103,7 @@ and:
 {
   "call": { "id": "call_123", "from": "+15551234567" },
   "messages": [
-    { "role": "caller", "content": "What do you cost?" }
+    { "role": "caller", "content": "Do you accommodate nut allergies?" }
   ]
 }
 ```
@@ -122,12 +122,15 @@ Put approved caller-facing information in `kb/`.
 
 Recommended files:
 
-- `kb/company-overview.md`
-- `kb/pricing.md`
+- `kb/restaurant-overview.md`
+- `kb/menu.md`
+- `kb/food-modifications.md`
+- `kb/allergy-practices.md`
+- `kb/large-party-policy.md`
+- `kb/prix-fixe-large-parties.md`
+- `kb/chef-and-owners.md`
+- `kb/reservation-inquiry-large-party.md`
 - `kb/faq.md`
-- `kb/support-policies.md`
-- `kb/security-compliance.md`
-- `kb/sales-objections.md`
 - `kb/handoff-rules.md`
 - `kb/competitors/*.md`
 
