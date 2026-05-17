@@ -48,4 +48,29 @@ describe("server", () => {
     expect(response.text).toContain('"interim":true');
     expect(response.text).toContain('"text":"The answer."');
   });
+
+  it("streams an interim response before slow voice answers", async () => {
+    let answerStarted = false;
+    const app = createApp(
+      () =>
+        new Promise((resolve) => {
+          answerStarted = true;
+          setTimeout(() => resolve("The answer."), 25);
+        })
+    );
+
+    const response = await postSigned(app, "/webhooks/agentphone", {
+      channel: "voice",
+      event: "agent.message",
+      transcript: "Do you have oysters?"
+    }).expect(200);
+
+    const lines = response.text.trim().split("\n").map((line) => JSON.parse(line));
+    expect(answerStarted).toBe(true);
+    expect(response.headers["content-type"]).toContain("application/x-ndjson");
+    expect(lines).toEqual([
+      { text: "Of course. Let me check that for you.", interim: true },
+      { text: "The answer." }
+    ]);
+  });
 });

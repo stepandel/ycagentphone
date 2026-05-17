@@ -3,14 +3,20 @@ import { config } from "./config.js";
 import { answerCaller, type AnswerService } from "./agent.js";
 import {
   extractCallTurn,
-  formatAgentPhoneNdjson,
   formatAgentPhoneResponse,
+  formatAgentPhoneStreamingResponse,
   verifyAgentPhoneSignature
 } from "./agentphone.js";
 
 type RawBodyRequest = Request & {
   rawBody?: Buffer;
 };
+
+function bodyChannel(body: unknown): string | undefined {
+  if (typeof body !== "object" || body === null) return undefined;
+  const channel = (body as Record<string, unknown>).channel;
+  return typeof channel === "string" ? channel.toLowerCase() : undefined;
+}
 
 export function createApp(answerService: AnswerService = answerCaller) {
   const app = express();
@@ -39,9 +45,39 @@ export function createApp(answerService: AnswerService = answerCaller) {
       return;
     }
 
+    let turn: ReturnType<typeof extractCallTurn>;
+    try {
+      turn = extractCallTurn(req.body);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown webhook error.";
+      console.error(message);
+      res.status(400).json({ error: message });
+      return;
+    }
+
+    const shouldStream =
+      !turn.isCallStart &&
+      (req.query.stream === "1" ||
+        req.headers.accept?.includes("application/x-ndjson") ||
+        bodyChannel(req.body) === "voice");
+
+    if (shouldStream) {
+      res.setHeader("Content-Type", "application/x-ndjson");
+      res.write(`${JSON.stringify({ text: config.RESTAURANT_PROCESSING_MESSAGE, interim: true })}\n`);
+      try {
+        const answer = await answerService(turn);
+        res.write(`${JSON.stringify({ text: answer })}\n`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown webhook error.";
+        console.error(message);
+        res.write(`${JSON.stringify({ text: "I'm sorry, I had trouble checking that. Please try again in a moment." })}\n`);
+      }
+      res.end();
+      return;
+    }
+
     let answer = "";
     try {
-      const turn = extractCallTurn(req.body);
       answer = await answerService(turn);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown webhook error.";
@@ -52,7 +88,7 @@ export function createApp(answerService: AnswerService = answerCaller) {
 
     if (req.query.stream === "1" || req.headers.accept?.includes("application/x-ndjson")) {
       res.setHeader("Content-Type", "application/x-ndjson");
-      res.send(formatAgentPhoneNdjson(answer));
+      res.send(formatAgentPhoneStreamingResponse(config.RESTAURANT_PROCESSING_MESSAGE, answer));
       return;
     }
 

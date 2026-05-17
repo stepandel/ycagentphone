@@ -127,8 +127,12 @@ export function formatAgentPhoneResponse(answer: string): UnknownRecord {
 }
 
 export function formatAgentPhoneNdjson(answer: string): string {
+  return formatAgentPhoneStreamingResponse("Let me check that.", answer);
+}
+
+export function formatAgentPhoneStreamingResponse(interim: string, answer: string): string {
   return [
-    JSON.stringify({ text: "Let me check that.", interim: true }),
+    JSON.stringify({ text: interim, interim: true }),
     JSON.stringify({ text: answer })
   ].join("\n");
 }
