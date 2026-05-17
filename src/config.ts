@@ -55,6 +55,7 @@ const envSchema = z.object({
   COMPANY_NAME: z.string().default("Your Restaurant"),
   RESTAURANT_GREETING: z.string().default("Good evening, and thank you for calling. This is the restaurant's virtual host. How may I help you today?"),
   RESTAURANT_PROCESSING_MESSAGE: z.string().default("Of course. Let me check that for you."),
+  RESERVATION_LOG_PATH: z.string().default("data/reservation-log.md"),
   PUBLIC_CONTACT_EMAIL: z.string().email().default("sales@example.com"),
   PORT: z.coerce.number().int().positive().default(3000),
   HOST: z.string().default("::"),

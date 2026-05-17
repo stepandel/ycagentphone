@@ -9,6 +9,7 @@ import {
   verifyAgentPhoneSignature
 } from "./agentphone.js";
 import { createPostCallService, type PostCallService } from "./post-call.js";
+import { recordReservationTextFollowUp } from "./reservation-log.js";
 import { initLangfuseTracing, shutdownLangfuseTracing } from "./tracing.js";
 
 type RawBodyRequest = Request & {
@@ -32,6 +33,25 @@ function answerChunk(answer: AnswerResult) {
         text: answer.text,
         ...(answer.hangup ? { hangup: true, action: "hangup" } : {})
       };
+}
+
+function isTextFollowUp(req: Request, turn: ReturnType<typeof extractCallTurn>): boolean {
+  if (turn.isCallStart || !turn.caller || !turn.transcript?.trim()) return false;
+  const channel = bodyChannel(req.body);
+  return channel === "sms" || channel === "text" || channel === "message";
+}
+
+async function recordTextFollowUp(req: Request, turn: ReturnType<typeof extractCallTurn>): Promise<void> {
+  if (!isTextFollowUp(req, turn)) return;
+  try {
+    await recordReservationTextFollowUp({
+      caller: turn.caller,
+      transcript: turn.transcript
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown reservation log error.";
+    console.error(`Reservation text follow-up log failed: ${message}`);
+  }
 }
 
 export function createApp(answerService: AnswerService = answerCaller, postCallService: PostCallService = createPostCallService()) {
@@ -95,6 +115,7 @@ export function createApp(answerService: AnswerService = answerCaller, postCallS
       res.write(`${JSON.stringify({ text: config.RESTAURANT_PROCESSING_MESSAGE, interim: true })}\n`);
       try {
         const answer = await answerService(turn);
+        await recordTextFollowUp(req, turn);
         res.write(`${JSON.stringify(answerChunk(answer))}\n`);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown webhook error.";
@@ -108,6 +129,7 @@ export function createApp(answerService: AnswerService = answerCaller, postCallS
     let answer: AnswerResult = "";
     try {
       answer = await answerService(turn);
+      await recordTextFollowUp(req, turn);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown webhook error.";
       console.error(message);

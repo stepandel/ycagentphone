@@ -158,7 +158,9 @@ For NDJSON-style streaming, call:
 /webhooks/agentphone?stream=1
 ```
 
-Post-call webhooks use AgentPhone's `agent.call_ended` event. The service extracts the full transcript from `data.transcript`, summarizes reservation context with OpenAI, then sends a brief follow-up message to the caller with party size, day/time, special notes, and the correct Stripe deposit link when configured. Parties of 10 or fewer use the `$20` standard reservation deposit; parties over 10 use the `$100` large-party deposit. Outbound messaging requires `AGENTPHONE_API_KEY` and `AGENTPHONE_AGENT_ID`; `AGENTPHONE_BASE_URL` defaults to `https://api.agentphone.ai`.
+Post-call webhooks use AgentPhone's `agent.call_ended` event. The service extracts the full transcript from `data.transcript`, summarizes reservation context with OpenAI, writes a Markdown reservation log entry, then sends a brief follow-up message to the caller with party size, day/time, special notes, and the correct Stripe deposit link when configured. Parties of 10 or fewer use the `$20` standard reservation deposit; parties over 10 use the `$100` large-party deposit. Outbound messaging requires `AGENTPHONE_API_KEY` and `AGENTPHONE_AGENT_ID`; `AGENTPHONE_BASE_URL` defaults to `https://api.agentphone.ai`.
+
+Reservation log entries default to `data/reservation-log.md` and can be moved with `RESERVATION_LOG_PATH`. The file is readable Markdown with embedded metadata so later SMS/text webhooks from the same caller can pull the latest reservation context and append follow-up changes to the same reservation history.
 
 ## Knowledgebase
 

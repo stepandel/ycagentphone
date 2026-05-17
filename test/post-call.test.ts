@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { createPostCallService, formatReservationConfirmationMessage, reservationDepositForPartySize } from "../src/post-call.js";
+import type { ReservationLogEntry } from "../src/reservation-log.js";
 
 describe("formatReservationConfirmationMessage", () => {
   it("formats brief reservation details for the caller", () => {
@@ -82,6 +83,7 @@ describe("formatReservationConfirmationMessage", () => {
 describe("createPostCallService", () => {
   it("extracts reservation details and sends a post-call message", async () => {
     const sent: unknown[] = [];
+    const logged: ReservationLogEntry[] = [];
     const service = createPostCallService(
       async () => ({
         shouldSend: true,
@@ -96,6 +98,9 @@ describe("createPostCallService", () => {
       async (message) => {
         sent.push(message);
         return {};
+      },
+      async (entry) => {
+        logged.push(entry);
       }
     );
 
@@ -116,6 +121,19 @@ describe("createPostCallService", () => {
         body: result.message
       }
     ]);
+    expect(logged).toEqual([
+      expect.objectContaining({
+        id: "call_123",
+        callId: "call_123",
+        caller: "+15551234567",
+        reservation: expect.objectContaining({
+          partySize: "6",
+          day: "Saturday",
+          time: "8 PM",
+          specialNotes: "nut allergy"
+        })
+      })
+    ]);
   });
 
   it("does not send when the call was not a reservation request", async () => {
@@ -127,6 +145,9 @@ describe("createPostCallService", () => {
       }),
       async () => {
         throw new Error("should not send");
+      },
+      async () => {
+        throw new Error("should not log");
       }
     );
 

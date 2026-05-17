@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { config } from "./config.js";
 import { formatKnowledgeSnippets, searchKnowledgebase } from "./memory.js";
 import { buildSystemPrompt } from "./prompt.js";
+import { formatReservationLogContextForCaller } from "./reservation-log.js";
 import { buildSkillContext } from "./skills/index.js";
 import { observeOpenAIForTurn, withAnswerTrace, withKnowledgeRetrievalTrace } from "./tracing.js";
 import type { VoiceAnswer } from "./agentphone.js";
@@ -48,6 +49,7 @@ export const answerCaller: AnswerService = async ({ transcript, isCallStart, cal
 
   const knowledge = await withKnowledgeRetrievalTrace(transcript, () => searchKnowledgebase(transcript));
   const skillContext = buildSkillContext(transcript);
+  const reservationLogContext = await formatReservationLogContextForCaller(caller);
 
   const response = await observeOpenAIForTurn(getOpenAI(), { transcript, isCallStart, callId, caller }).responses.create({
     model: config.OPENAI_MODEL,
@@ -63,6 +65,8 @@ export const answerCaller: AnswerService = async ({ transcript, isCallStart, cal
               caller ? `Caller: ${caller}` : undefined,
               "Matched call skill context:",
               skillContext,
+              "Existing reservation log:",
+              reservationLogContext,
               "Knowledgebase search results:",
               formatKnowledgeSnippets(knowledge),
               "Caller transcript:",

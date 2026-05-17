@@ -5,6 +5,7 @@ import {
   type PostCallWebhook,
   type SendAgentPhoneMessageOptions
 } from "./agentphone.js";
+import { appendReservationLogEntry, createReservationLogEntry, type ReservationLogEntry } from "./reservation-log.js";
 
 export type ReservationDetails = {
   guestName?: string;
@@ -29,6 +30,7 @@ export type PostCallResult = {
 
 export type PostCallMessageSender = (options: Omit<SendAgentPhoneMessageOptions, "apiKey" | "agentId" | "baseUrl">) => Promise<unknown>;
 export type PostCallExtractor = (call: PostCallWebhook) => Promise<PostCallSummary>;
+export type ReservationLogWriter = (entry: ReservationLogEntry) => Promise<void>;
 export type PostCallService = (call: PostCallWebhook) => Promise<PostCallResult>;
 
 type ReservationDeposit = {
@@ -174,7 +176,8 @@ export function createPostCallService(
       apiKey: config.AGENTPHONE_API_KEY,
       agentId: config.AGENTPHONE_AGENT_ID,
       baseUrl: config.AGENTPHONE_BASE_URL
-    })
+    }),
+  reservationLogWriter: ReservationLogWriter = appendReservationLogEntry
 ): PostCallService {
   return async (call) => {
     if (!call.caller || call.caller === "web") {
@@ -185,6 +188,15 @@ export function createPostCallService(
     if (!summary.shouldSend) {
       return { sent: false, reason: "Call did not include a reservation request.", summary };
     }
+
+    await reservationLogWriter(
+      createReservationLogEntry({
+        callId: call.callId,
+        caller: call.caller,
+        conversationContext: summary.conversationContext,
+        reservation: summary.reservation
+      })
+    );
 
     const message = formatReservationConfirmationMessage(summary);
     await sender({
