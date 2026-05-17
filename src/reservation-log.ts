@@ -1,11 +1,13 @@
 import { mkdir, readFile, appendFile } from "node:fs/promises";
 import path from "node:path";
 import { config } from "./config.js";
-import type { ReservationDetails } from "./post-call.js";
+import type { ReservationDeposit, ReservationDetails } from "./post-call.js";
 import {
   createReservation,
+  findLatestReservationByPhone,
   openReservationDatabase,
   parseReservationDateTime,
+  type Reservation,
   seedDiningTables
 } from "./reservation-store.js";
 
@@ -20,6 +22,7 @@ export type ReservationLogEntry = {
   createdAt: string;
   conversationContext?: string;
   reservation: ReservationDetails;
+  deposit?: ReservationDeposit;
 };
 
 export type ReservationLogFollowUp = {
@@ -142,6 +145,28 @@ function formatReservationUpdates(updates: Partial<ReservationDetails> | undefin
   return parts.length > 0 ? parts.join("; ") : undefined;
 }
 
+function formatDepositContext(deposit: ReservationDeposit | undefined): string {
+  if (!deposit) return "not tracked";
+  const amount = deposit.amountLabel || (deposit.amountCents && deposit.currency ? `${deposit.amountCents} ${deposit.currency}` : "deposit");
+  const link = deposit.paymentLinkUrl ? `; link sent: ${deposit.paymentLinkUrl}` : "";
+  return `pending ${amount}${link}`;
+}
+
+function formatSqliteDepositContext(reservation: Reservation | undefined, fallback: ReservationDeposit | undefined): string {
+  if (!reservation) return formatDepositContext(fallback);
+  const amount =
+    reservation.depositAmountCents && reservation.depositCurrency
+      ? new Intl.NumberFormat("en-US", {
+          style: "currency",
+          currency: reservation.depositCurrency.toUpperCase(),
+          maximumFractionDigits: reservation.depositAmountCents % 100 === 0 ? 0 : 2
+        }).format(reservation.depositAmountCents / 100)
+      : "not specified";
+  const paidAt = reservation.depositPaidAt ? `; paid at ${reservation.depositPaidAt}` : "";
+  const link = reservation.depositPaymentLinkUrl ? `; link: ${reservation.depositPaymentLinkUrl}` : "";
+  return `${reservation.depositStatus.replaceAll("_", " ")}; amount: ${amount}${paidAt}${link}`;
+}
+
 function mergeReservationUpdates(
   reservation: ReservationDetails,
   updates: Partial<ReservationDetails> | undefined
@@ -165,6 +190,7 @@ export function createReservationLogEntry(input: {
   caller: string;
   conversationContext?: string;
   reservation: ReservationDetails;
+  deposit?: ReservationDeposit;
   createdAt?: string;
 }): ReservationLogEntry {
   const createdAt = input.createdAt ?? new Date().toISOString();
@@ -174,7 +200,8 @@ export function createReservationLogEntry(input: {
     caller: input.caller,
     createdAt,
     conversationContext: input.conversationContext,
-    reservation: input.reservation
+    reservation: input.reservation,
+    deposit: input.deposit
   };
 }
 
@@ -205,6 +232,10 @@ export async function appendReservationLogEntryToSqlite(entry: ReservationLogEnt
       partySize,
       startsAt,
       notes: [entry.reservation.specialNotes, entry.conversationContext].filter(Boolean).join("; ") || undefined,
+      depositAmountCents: entry.deposit?.amountCents,
+      depositCurrency: entry.deposit?.currency,
+      depositPaymentLinkUrl: entry.deposit?.paymentLinkUrl,
+      depositStatus: entry.deposit ? "pending" : "not_required",
       createdAt: entry.createdAt
     });
   } finally {
@@ -289,6 +320,17 @@ export async function formatReservationLogContextForCaller(
     latest.reservation
   );
   const recentFollowUps = followUps.slice(-3);
+  let sqliteReservation: Reservation | undefined;
+  try {
+    const db = openReservationDatabase();
+    try {
+      sqliteReservation = findLatestReservationByPhone(db, caller);
+    } finally {
+      db.close();
+    }
+  } catch {
+    sqliteReservation = undefined;
+  }
 
   return [
     "Reservation log context for this caller:",
@@ -297,6 +339,7 @@ export async function formatReservationLogContextForCaller(
     `Party size: ${currentReservation.partySize ?? "not provided"}`,
     `Date/time: ${[currentReservation.day, currentReservation.time].filter(Boolean).join(" at ") || "not provided"}`,
     `Special notes: ${currentReservation.specialNotes ?? "none"}`,
+    `Deposit: ${formatSqliteDepositContext(sqliteReservation, latest.deposit)}`,
     latest.conversationContext ? `Original context: ${latest.conversationContext}` : undefined,
     recentFollowUps.length > 0
       ? [

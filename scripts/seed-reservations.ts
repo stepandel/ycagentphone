@@ -15,6 +15,7 @@ type SeedReservation = {
   startsAt: string;
   notes?: string;
   status?: "booked" | "seated" | "completed" | "cancelled" | "no_show";
+  depositStatus?: "pending" | "paid" | "waived";
 };
 
 const dateRange = [
@@ -111,7 +112,8 @@ function buildSeedReservations(): SeedReservation[] {
         partySize,
         startsAt: startsAt(date, time),
         notes: notes[(index + dayIndex) % notes.length],
-        status: dayIndex === 0 && time < "19:00" ? "completed" : "booked"
+        status: dayIndex === 0 && time < "19:00" ? "completed" : "booked",
+        depositStatus: (index + dayIndex) % 9 === 0 ? "waived" : (index + dayIndex) % 3 === 0 ? "paid" : "pending"
       });
       index += 1;
     }
@@ -162,6 +164,11 @@ for (const reservation of buildSeedReservations()) {
     createReservation(db, {
       ...reservation,
       sourceCallId: "seed",
+      depositAmountCents: reservation.partySize > 10 ? 10000 : 2000,
+      depositCurrency: "usd",
+      depositPaymentLinkUrl: reservation.partySize > 10
+        ? config.STRIPE_LARGE_PARTY_RESERVATION_PAYMENT_LINK_URL ?? config.STRIPE_RESERVATION_PAYMENT_LINK_URL
+        : config.STRIPE_STANDARD_RESERVATION_PAYMENT_LINK_URL ?? config.STRIPE_RESERVATION_PAYMENT_LINK_URL,
       createdAt: "2026-05-17T16:00:00-07:00"
     });
     inserted += 1;

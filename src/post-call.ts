@@ -33,8 +33,10 @@ export type PostCallExtractor = (call: PostCallWebhook) => Promise<PostCallSumma
 export type ReservationLogWriter = (entry: ReservationLogEntry) => Promise<void>;
 export type PostCallService = (call: PostCallWebhook) => Promise<PostCallResult>;
 
-type ReservationDeposit = {
+export type ReservationDeposit = {
   amountLabel: string;
+  amountCents?: number;
+  currency?: string;
   paymentLinkUrl?: string;
 };
 
@@ -113,6 +115,8 @@ export function reservationDepositForPartySize(partySize: string | undefined): R
 
   return {
     amountLabel: formatDepositAmount(amountCents, config.STRIPE_RESERVATION_DEPOSIT_CURRENCY),
+    amountCents,
+    currency: config.STRIPE_RESERVATION_DEPOSIT_CURRENCY.toLowerCase(),
     paymentLinkUrl
   };
 }
@@ -189,16 +193,19 @@ export function createPostCallService(
       return { sent: false, reason: "Call did not include a reservation request.", summary };
     }
 
+    const deposit = reservationDepositForPartySize(summary.reservation.partySize);
+
     await reservationLogWriter(
       createReservationLogEntry({
         callId: call.callId,
         caller: call.caller,
         conversationContext: summary.conversationContext,
-        reservation: summary.reservation
+        reservation: summary.reservation,
+        deposit
       })
     );
 
-    const message = formatReservationConfirmationMessage(summary);
+    const message = formatReservationConfirmationMessage(summary, deposit);
     await sender({
       toNumber: call.caller,
       numberId: call.numberId,

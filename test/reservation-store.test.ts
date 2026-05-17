@@ -9,7 +9,9 @@ import {
   initializeReservationSchema,
   parseReservationDateTime,
   parseReservationRequestText,
-  seedDiningTables
+  seedDiningTables,
+  updateReservationDepositStatus,
+  updateReservationDepositStatusForStripeReference
 } from "../src/reservation-store.js";
 
 function testDatabase(): Database {
@@ -33,10 +35,15 @@ describe("reservation store", () => {
       phone: "+15551234567",
       partySize: 4,
       startsAt: "2026-05-22T19:00:00-07:00",
+      depositAmountCents: 2000,
+      depositCurrency: "usd",
+      depositPaymentLinkUrl: "https://buy.stripe.com/test_standard",
       notes: "birthday"
     });
 
     expect(reservation.durationMinutes).toBe(75);
+    expect(reservation.depositStatus).toBe("pending");
+    expect(reservation.depositAmountCents).toBe(2000);
 
     const overlapping = findAvailableTables(db, {
       partySize: 4,
@@ -101,6 +108,40 @@ describe("reservation store", () => {
     expect(context).toContain("Default dining time: 75 minutes");
     expect(context).toContain("Available: yes");
     expect(context).toContain("Taylor; party of 4");
+    expect(context).toContain("deposit: not required");
+  });
+
+  it("tracks Stripe deposit status and references", () => {
+    const db = testDatabase();
+    createReservation(db, {
+      id: "res_paid",
+      guestName: "Morgan",
+      phone: "+15551230000",
+      partySize: 6,
+      startsAt: "2026-05-22T17:00:00-07:00",
+      depositAmountCents: 2000,
+      depositCurrency: "usd",
+      depositPaymentLinkUrl: "https://buy.stripe.com/test_standard",
+      stripeCheckoutSessionId: "cs_test_123"
+    });
+
+    const paid = updateReservationDepositStatus(db, {
+      reservationId: "res_paid",
+      depositStatus: "paid",
+      paidAt: "2026-05-17T20:00:00-07:00",
+      stripePaymentIntentId: "pi_test_123"
+    });
+
+    expect(paid.depositStatus).toBe("paid");
+    expect(paid.depositPaidAt).toBe("2026-05-18T03:00:00.000Z");
+    expect(paid.stripeCheckoutSessionId).toBe("cs_test_123");
+    expect(paid.stripePaymentIntentId).toBe("pi_test_123");
+
+    const refunded = updateReservationDepositStatusForStripeReference(db, {
+      stripePaymentIntentId: "pi_test_123",
+      depositStatus: "refunded"
+    });
+    expect(refunded?.depositStatus).toBe("refunded");
   });
 
   it("parses common caller reservation language into restaurant-local datetimes", () => {

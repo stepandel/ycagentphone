@@ -6,6 +6,7 @@ import { config } from "./config.js";
 export const DEFAULT_RESERVATION_DURATION_MINUTES = 75;
 
 export type ReservationStatus = "booked" | "seated" | "completed" | "cancelled" | "no_show";
+export type ReservationDepositStatus = "not_required" | "pending" | "paid" | "failed" | "refunded" | "waived";
 
 export type DiningTableInput = {
   name: string;
@@ -28,6 +29,13 @@ export type ReservationInput = {
   durationMinutes?: number;
   status?: ReservationStatus;
   notes?: string;
+  depositAmountCents?: number;
+  depositCurrency?: string;
+  depositPaymentLinkUrl?: string;
+  depositStatus?: ReservationDepositStatus;
+  stripeCheckoutSessionId?: string;
+  stripePaymentIntentId?: string;
+  stripePaymentLinkId?: string;
   tableIds?: number[];
   createdAt?: string | Date;
 };
@@ -43,6 +51,14 @@ export type Reservation = {
   durationMinutes: number;
   status: ReservationStatus;
   notes?: string;
+  depositAmountCents?: number;
+  depositCurrency?: string;
+  depositPaymentLinkUrl?: string;
+  depositStatus: ReservationDepositStatus;
+  depositPaidAt?: string;
+  stripeCheckoutSessionId?: string;
+  stripePaymentIntentId?: string;
+  stripePaymentLinkId?: string;
   tableIds: number[];
 };
 
@@ -81,6 +97,14 @@ type ReservationRow = {
   duration_minutes: number;
   status: ReservationStatus;
   notes: string | null;
+  deposit_amount_cents: number | null;
+  deposit_currency: string | null;
+  deposit_payment_link_url: string | null;
+  deposit_status: ReservationDepositStatus;
+  deposit_paid_at: string | null;
+  stripe_checkout_session_id: string | null;
+  stripe_payment_intent_id: string | null;
+  stripe_payment_link_id: string | null;
 };
 
 type ReservationLogRow = {
@@ -91,6 +115,7 @@ type ReservationLogRow = {
   phone: string | null;
   party_size: number;
   status: ReservationStatus;
+  deposit_status: ReservationDepositStatus;
   tables: string | null;
   notes: string | null;
 };
@@ -359,6 +384,16 @@ function parsePositiveInteger(value: number, label: string): number {
   return value;
 }
 
+function optionalPositiveInteger(value: number | undefined, label: string): number | undefined {
+  return value === undefined ? undefined : parsePositiveInteger(value, label);
+}
+
+function addColumnIfMissing(db: Database, table: string, column: string, definition: string): void {
+  const columns = db.query<{ name: string }, []>(`PRAGMA table_info(${table})`).all();
+  if (columns.some((item) => item.name === column)) return;
+  db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+}
+
 export function openReservationDatabase(dbPath = config.RESERVATION_DB_PATH): Database {
   if (dbPath !== ":memory:") {
     mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -391,6 +426,14 @@ export function initializeReservationSchema(db: Database): void {
       duration_minutes INTEGER NOT NULL DEFAULT 75 CHECK (duration_minutes > 0),
       status TEXT NOT NULL DEFAULT 'booked' CHECK (status IN ('booked', 'seated', 'completed', 'cancelled', 'no_show')),
       notes TEXT,
+      deposit_amount_cents INTEGER CHECK (deposit_amount_cents IS NULL OR deposit_amount_cents > 0),
+      deposit_currency TEXT,
+      deposit_payment_link_url TEXT,
+      deposit_status TEXT NOT NULL DEFAULT 'not_required' CHECK (deposit_status IN ('not_required', 'pending', 'paid', 'failed', 'refunded', 'waived')),
+      deposit_paid_at TEXT,
+      stripe_checkout_session_id TEXT,
+      stripe_payment_intent_id TEXT,
+      stripe_payment_link_id TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
@@ -418,7 +461,27 @@ export function initializeReservationSchema(db: Database): void {
       reason TEXT
     );
 
+  `);
+
+  addColumnIfMissing(db, "reservations", "deposit_amount_cents", "INTEGER CHECK (deposit_amount_cents IS NULL OR deposit_amount_cents > 0)");
+  addColumnIfMissing(db, "reservations", "deposit_currency", "TEXT");
+  addColumnIfMissing(db, "reservations", "deposit_payment_link_url", "TEXT");
+  addColumnIfMissing(
+    db,
+    "reservations",
+    "deposit_status",
+    "TEXT NOT NULL DEFAULT 'not_required' CHECK (deposit_status IN ('not_required', 'pending', 'paid', 'failed', 'refunded', 'waived'))"
+  );
+  addColumnIfMissing(db, "reservations", "deposit_paid_at", "TEXT");
+  addColumnIfMissing(db, "reservations", "stripe_checkout_session_id", "TEXT");
+  addColumnIfMissing(db, "reservations", "stripe_payment_intent_id", "TEXT");
+  addColumnIfMissing(db, "reservations", "stripe_payment_link_id", "TEXT");
+
+  db.exec(`
     CREATE INDEX IF NOT EXISTS reservations_time_idx ON reservations(starts_at, ends_at, status);
+    CREATE INDEX IF NOT EXISTS reservations_deposit_status_idx ON reservations(deposit_status, deposit_paid_at);
+    CREATE INDEX IF NOT EXISTS reservations_stripe_checkout_session_idx ON reservations(stripe_checkout_session_id);
+    CREATE INDEX IF NOT EXISTS reservations_stripe_payment_intent_idx ON reservations(stripe_payment_intent_id);
     CREATE INDEX IF NOT EXISTS reservation_tables_table_idx ON reservation_tables(table_id);
     CREATE INDEX IF NOT EXISTS table_blocks_time_idx ON table_blocks(starts_at, ends_at);
 
@@ -433,6 +496,7 @@ export function initializeReservationSchema(db: Database): void {
         r.phone,
         r.party_size,
         r.status,
+        r.deposit_status,
         group_concat(t.name, ', ') AS tables,
         r.notes
       FROM reservations r
@@ -543,6 +607,8 @@ export function createReservation(db: Database, input: ReservationInput): Reserv
   const createdAt = isoDateTime(input.createdAt ?? new Date());
   const id = input.id ?? reservationId(createdAt);
   const status = input.status ?? "booked";
+  const depositAmountCents = optionalPositiveInteger(input.depositAmountCents, "Deposit amount");
+  const depositStatus = input.depositStatus ?? (depositAmountCents ? "pending" : "not_required");
   const tableIds =
     input.tableIds ??
     findAvailableTables(db, { partySize, startsAt, durationMinutes }).suggestedTableIds;
@@ -561,10 +627,14 @@ export function createReservation(db: Database, input: ReservationInput): Reserv
     db.prepare(`
       INSERT INTO reservations (
         id, source_call_id, guest_name, phone, party_size, starts_at, ends_at,
-        duration_minutes, status, notes, created_at, updated_at
+        duration_minutes, status, notes, deposit_amount_cents, deposit_currency,
+        deposit_payment_link_url, deposit_status, stripe_checkout_session_id,
+        stripe_payment_intent_id, stripe_payment_link_id, created_at, updated_at
       )
       VALUES ($id, $sourceCallId, $guestName, $phone, $partySize, $startsAt, $endsAt,
-        $durationMinutes, $status, $notes, $createdAt, $createdAt)
+        $durationMinutes, $status, $notes, $depositAmountCents, $depositCurrency,
+        $depositPaymentLinkUrl, $depositStatus, $stripeCheckoutSessionId,
+        $stripePaymentIntentId, $stripePaymentLinkId, $createdAt, $createdAt)
     `).run({
       $id: id,
       $sourceCallId: input.sourceCallId ?? null,
@@ -576,6 +646,13 @@ export function createReservation(db: Database, input: ReservationInput): Reserv
       $durationMinutes: durationMinutes,
       $status: status,
       $notes: input.notes ?? null,
+      $depositAmountCents: depositAmountCents ?? null,
+      $depositCurrency: input.depositCurrency?.toLowerCase() ?? null,
+      $depositPaymentLinkUrl: input.depositPaymentLinkUrl ?? null,
+      $depositStatus: depositStatus,
+      $stripeCheckoutSessionId: input.stripeCheckoutSessionId ?? null,
+      $stripePaymentIntentId: input.stripePaymentIntentId ?? null,
+      $stripePaymentLinkId: input.stripePaymentLinkId ?? null,
       $createdAt: createdAt
     });
 
@@ -605,8 +682,110 @@ export function getReservation(db: Database, id: string): Reservation {
     durationMinutes: row.duration_minutes,
     status: row.status,
     notes: row.notes ?? undefined,
+    depositAmountCents: row.deposit_amount_cents ?? undefined,
+    depositCurrency: row.deposit_currency ?? undefined,
+    depositPaymentLinkUrl: row.deposit_payment_link_url ?? undefined,
+    depositStatus: row.deposit_status,
+    depositPaidAt: row.deposit_paid_at ?? undefined,
+    stripeCheckoutSessionId: row.stripe_checkout_session_id ?? undefined,
+    stripePaymentIntentId: row.stripe_payment_intent_id ?? undefined,
+    stripePaymentLinkId: row.stripe_payment_link_id ?? undefined,
     tableIds: tableRows.map((table) => table.table_id)
   };
+}
+
+export function findLatestReservationByPhone(db: Database, phone: string): Reservation | undefined {
+  const row = db
+    .query<{ id: string }, [string]>(
+      `
+        SELECT id
+        FROM reservations
+        WHERE replace(replace(replace(replace(phone, ' ', ''), '(', ''), ')', ''), '-', '') = ?
+        ORDER BY starts_at DESC
+        LIMIT 1
+      `
+    )
+    .get(phone.replace(/[^\d+]/g, ""));
+  return row ? getReservation(db, row.id) : undefined;
+}
+
+export function updateReservationDepositStatus(
+  db: Database,
+  input: {
+    reservationId: string;
+    depositStatus: ReservationDepositStatus;
+    paidAt?: string | Date;
+    stripeCheckoutSessionId?: string;
+    stripePaymentIntentId?: string;
+    stripePaymentLinkId?: string;
+  }
+): Reservation {
+  const paidAt =
+    input.depositStatus === "paid"
+      ? isoDateTime(input.paidAt ?? new Date())
+      : input.paidAt
+        ? isoDateTime(input.paidAt)
+        : null;
+
+  const result = db.prepare(`
+    UPDATE reservations
+    SET
+      deposit_status = $depositStatus,
+      deposit_paid_at = $depositPaidAt,
+      stripe_checkout_session_id = COALESCE($stripeCheckoutSessionId, stripe_checkout_session_id),
+      stripe_payment_intent_id = COALESCE($stripePaymentIntentId, stripe_payment_intent_id),
+      stripe_payment_link_id = COALESCE($stripePaymentLinkId, stripe_payment_link_id),
+      updated_at = $updatedAt
+    WHERE id = $reservationId
+  `).run({
+    $reservationId: input.reservationId,
+    $depositStatus: input.depositStatus,
+    $depositPaidAt: paidAt,
+    $stripeCheckoutSessionId: input.stripeCheckoutSessionId ?? null,
+    $stripePaymentIntentId: input.stripePaymentIntentId ?? null,
+    $stripePaymentLinkId: input.stripePaymentLinkId ?? null,
+    $updatedAt: new Date().toISOString()
+  });
+
+  if (result.changes === 0) throw new Error(`Reservation not found: ${input.reservationId}`);
+  return getReservation(db, input.reservationId);
+}
+
+export function updateReservationDepositStatusForStripeReference(
+  db: Database,
+  input: {
+    stripeCheckoutSessionId?: string;
+    stripePaymentIntentId?: string;
+    depositStatus: ReservationDepositStatus;
+    paidAt?: string | Date;
+  }
+): Reservation | undefined {
+  const row = db
+    .query<{ id: string }, [string | null, string | null, string | null, string | null]>(
+      `
+        SELECT id
+        FROM reservations
+        WHERE (? IS NOT NULL AND stripe_checkout_session_id = ?)
+           OR (? IS NOT NULL AND stripe_payment_intent_id = ?)
+        ORDER BY starts_at DESC
+        LIMIT 1
+      `
+    )
+    .get(
+      input.stripeCheckoutSessionId ?? null,
+      input.stripeCheckoutSessionId ?? null,
+      input.stripePaymentIntentId ?? null,
+      input.stripePaymentIntentId ?? null
+    );
+
+  if (!row) return undefined;
+  return updateReservationDepositStatus(db, {
+    reservationId: row.id,
+    depositStatus: input.depositStatus,
+    paidAt: input.paidAt,
+    stripeCheckoutSessionId: input.stripeCheckoutSessionId,
+    stripePaymentIntentId: input.stripePaymentIntentId
+  });
 }
 
 export function blockTable(db: Database, input: { tableId?: number; startsAt: string | Date; endsAt: string | Date; reason?: string }): number {
@@ -633,6 +812,7 @@ export function formatReservationDayLog(db: Database, date: string): string {
           r.phone,
           r.party_size,
           r.status,
+          r.deposit_status,
           group_concat(t.name, ', ') AS tables,
           r.notes
         FROM reservations r
@@ -656,6 +836,7 @@ export function formatReservationDayLog(db: Database, date: string): string {
         `party of ${row.party_size}`,
         row.tables ? `tables: ${row.tables}` : "tables: unassigned",
         `status: ${row.status}`,
+        `deposit: ${row.deposit_status.replaceAll("_", " ")}`,
         row.notes ? `notes: ${row.notes}` : undefined
       ]
         .filter(Boolean)
