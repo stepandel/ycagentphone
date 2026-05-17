@@ -32,8 +32,9 @@ export function createApp(answerService: AnswerService = answerCaller) {
       req.headers["x-agentphone-signature"] ??
       req.headers["x-webhook-signature"] ??
       req.headers["x-signature"];
+    const timestamp = req.headers["x-webhook-timestamp"];
 
-    if (!verifyAgentPhoneSignature(req.rawBody ?? Buffer.from(""), signature, config.AGENTPHONE_WEBHOOK_SECRET)) {
+    if (!verifyAgentPhoneSignature(req.rawBody ?? Buffer.from(""), signature, config.AGENTPHONE_WEBHOOK_SECRET, timestamp)) {
       res.status(401).json({ error: "Invalid webhook signature." });
       return;
     }

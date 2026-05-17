@@ -48,6 +48,16 @@ describe("verifyAgentPhoneSignature", () => {
     expect(verifyAgentPhoneSignature(raw, `sha256=${signature}`, secret)).toBe(true);
     expect(verifyAgentPhoneSignature(raw, "bad", secret)).toBe(false);
   });
+
+  it("verifies timestamped webhook signatures", () => {
+    const raw = Buffer.from('{"transcript":"hello"}');
+    const secret = "secret";
+    const timestamp = "1767150000";
+    const signature = crypto.createHmac("sha256", secret).update(`${timestamp}.${raw}`).digest("hex");
+
+    expect(verifyAgentPhoneSignature(raw, `sha256=${signature}`, secret, timestamp)).toBe(true);
+    expect(verifyAgentPhoneSignature(raw, "bad", secret, timestamp)).toBe(false);
+  });
 });
 
 describe("formatAgentPhoneResponse", () => {

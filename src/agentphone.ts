@@ -72,16 +72,26 @@ export function extractCallTurn(payload: unknown): CallTurn {
 export function verifyAgentPhoneSignature(
   rawBody: Buffer,
   signatureHeader: string | string[] | undefined,
-  secret: string | undefined
+  secret: string | undefined,
+  timestampHeader?: string | string[] | undefined
 ): boolean {
   if (!secret) return true;
   const provided = Array.isArray(signatureHeader) ? signatureHeader[0] : signatureHeader;
   if (!provided) return false;
 
-  const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+  const timestamp = Array.isArray(timestampHeader) ? timestampHeader[0] : timestampHeader;
+  const signedPayload = timestamp ? Buffer.concat([Buffer.from(`${timestamp}.`), rawBody]) : rawBody;
+  const expected = crypto.createHmac("sha256", secret).update(signedPayload).digest("hex");
   const normalizedProvided = provided.replace(/^sha256=/, "").trim();
 
-  return timingSafeEqual(expected, normalizedProvided);
+  if (timingSafeEqual(expected, normalizedProvided)) return true;
+
+  if (timestamp) {
+    const legacyExpected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+    return timingSafeEqual(legacyExpected, normalizedProvided);
+  }
+
+  return false;
 }
 
 function timingSafeEqual(expected: string, provided: string): boolean {
