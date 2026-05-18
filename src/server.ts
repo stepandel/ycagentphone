@@ -107,12 +107,10 @@ function isTextFollowUp(req: Request, turn: ReturnType<typeof extractCallTurn>):
 async function recordTextFollowUp(req: Request, turn: ReturnType<typeof extractCallTurn>): Promise<void> {
   if (!isTextFollowUp(req, turn)) return;
   try {
-    const transcript = turn.transcript?.trim();
-    if (!transcript) return;
-    const updates = extractReservationUpdatesFromText(transcript);
-    const updateSummary = formatReservationUpdateSummary(updates);
-    const note = updateSummary ? `text follow-up: ${transcript} (${updateSummary})` : `text follow-up: ${transcript}`;
-    appendReservationNoteByCaller(turn.caller, note);
+    const updates = extractReservationUpdatesFromText(turn.transcript ?? "");
+    const summary = formatReservationUpdateSummary(updates);
+    if (!summary) return;
+    appendReservationNoteByCaller(turn.caller, `text update: ${summary}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown reservation note error.";
     console.error(`Reservation text follow-up note failed: ${message}`);

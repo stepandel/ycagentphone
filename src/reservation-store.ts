@@ -976,7 +976,7 @@ export function recordReservationCall(input: RecordReservationCallInput): Record
       phone: input.caller,
       partySize,
       startsAt,
-      notes: [input.reservation.specialNotes, input.conversationContext].filter(Boolean).join("; ") || undefined,
+      notes: input.reservation.specialNotes?.trim() || undefined,
       depositAmountCents: input.deposit?.amountCents,
       depositCurrency: input.deposit?.currency,
       depositPaymentLinkUrl: input.deposit?.paymentLinkUrl,
@@ -989,14 +989,23 @@ export function recordReservationCall(input: RecordReservationCallInput): Record
   }
 }
 
+const MAX_NOTE_CHARS = 160;
+const MAX_NOTES_TOTAL_CHARS = 600;
+
+function truncate(text: string, limit: number): string {
+  if (text.length <= limit) return text;
+  return `${text.slice(0, limit - 1).trimEnd()}…`;
+}
+
 export function appendReservationNoteByCaller(caller: string | undefined, note: string): Reservation | undefined {
   if (!caller || !note.trim()) return undefined;
   const db = openReservationDatabase();
   try {
     const latest = findLatestReservationByPhone(db, caller);
     if (!latest) return undefined;
-    const trimmed = note.trim();
-    const combined = latest.notes ? `${latest.notes}; ${trimmed}` : trimmed;
+    const trimmed = truncate(note.trim().replace(/\s+/g, " "), MAX_NOTE_CHARS);
+    const merged = latest.notes ? `${latest.notes}; ${trimmed}` : trimmed;
+    const combined = truncate(merged, MAX_NOTES_TOTAL_CHARS);
     db.prepare("UPDATE reservations SET notes = ?, updated_at = ? WHERE id = ?").run(combined, new Date().toISOString(), latest.id);
     return getReservation(db, latest.id);
   } finally {
