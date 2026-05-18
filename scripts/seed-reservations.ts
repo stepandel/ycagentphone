@@ -84,6 +84,8 @@ const notes = [
 const primeTimes = ["17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00"];
 const shoulderTimes = ["21:15"];
 const partySizes = [2, 2, 2, 3, 4, 4, 4, 5, 6, 6, 8, 10, 12, 14];
+const dailyCapacityHoldStart = "17:45";
+const dailyCapacityHoldEnd = "19:15";
 
 function startsAt(date: string, time: string): string {
   return `${date}T${time}:00-07:00`;
@@ -155,11 +157,6 @@ blockTable(db, {
   endsAt: startsAt("2026-05-23", "20:30"),
   reason: "seed: weather cover hold"
 });
-blockTable(db, {
-  startsAt: startsAt("2026-05-21", "17:45"),
-  endsAt: startsAt("2026-05-21", "19:15"),
-  reason: "seed: manager capacity hold for availability testing"
-});
 
 let inserted = 0;
 let skipped = 0;
@@ -184,8 +181,17 @@ for (const reservation of buildSeedReservations()) {
   }
 }
 
+for (const date of dateRange) {
+  blockTable(db, {
+    startsAt: startsAt(date, dailyCapacityHoldStart),
+    endsAt: startsAt(date, dailyCapacityHoldEnd),
+    reason: "seed: daily manager capacity hold for availability testing"
+  });
+}
+
 console.log(`Seeded ${inserted} realistic reservations into ${config.RESERVATION_DB_PATH}.`);
 if (skipped > 0) console.log(`Skipped ${skipped} reservations that could not fit the book.`);
+console.log(`Added daily capacity holds from ${dailyCapacityHoldStart} to ${dailyCapacityHoldEnd}.`);
 console.log(formatReservationDayLog(db, "2026-05-21"));
 
 db.close();
