@@ -53,6 +53,7 @@ const envSchema = z.object({
   STRIPE_RESERVATION_DEPOSIT_AMOUNT_CENTS: z.coerce.number().int().positive().default(2000),
   STRIPE_RESERVATION_DEPOSIT_CURRENCY: z.string().min(3).max(3).default("usd"),
   COMPANY_NAME: z.string().default("Your Restaurant"),
+  RESTAURANT_PHONE: z.string().default("(814) 679-3281"),
   RESTAURANT_TIME_ZONE: z.string().default("America/Los_Angeles"),
   RESTAURANT_GREETING: z.string().default("Good evening, and thank you for calling. This is the restaurant's virtual host. How may I help you today?"),
   RESTAURANT_PROCESSING_MESSAGE: z.string().default("Of course. Let me check that for you."),

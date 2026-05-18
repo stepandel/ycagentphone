@@ -126,7 +126,13 @@ export function createApp(
 
   app.get("/admin", (_req, res) => {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.send(renderAdminPage({ restaurantName: config.COMPANY_NAME, timeZone: config.RESTAURANT_TIME_ZONE }));
+    res.send(
+      renderAdminPage({
+        restaurantName: config.COMPANY_NAME,
+        timeZone: config.RESTAURANT_TIME_ZONE,
+        phone: config.RESTAURANT_PHONE
+      })
+    );
   });
 
   app.get("/admin/api/reservations", (_req, res) => {

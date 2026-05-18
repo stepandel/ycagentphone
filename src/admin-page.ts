@@ -1,6 +1,8 @@
-export function renderAdminPage(options: { restaurantName: string; timeZone: string }): string {
+export function renderAdminPage(options: { restaurantName: string; timeZone: string; phone: string }): string {
   const restaurantName = escapeHtml(options.restaurantName);
   const timeZone = escapeHtml(options.timeZone);
+  const phone = escapeHtml(options.phone);
+  const phoneHref = options.phone.replace(/[^\d+]/g, "");
 
   return `<!doctype html>
 <html lang="en">
@@ -46,12 +48,12 @@ export function renderAdminPage(options: { restaurantName: string; timeZone: str
     line-height: 1.45;
   }
   header.page {
-    padding: 28px 32px 12px;
+    padding: 28px 32px 20px;
     border-bottom: 1px solid var(--border);
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
-    align-items: flex-end;
+    align-items: center;
     gap: 16px;
   }
   header.page h1 {
@@ -62,6 +64,33 @@ export function renderAdminPage(options: { restaurantName: string; timeZone: str
   header.page .meta {
     color: var(--ink-faint);
     font-size: 12px;
+  }
+  header.page .phone {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    text-decoration: none;
+    color: var(--ink);
+    line-height: 1;
+  }
+  header.page .phone .phone-label {
+    color: var(--ink-faint);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  header.page .phone .phone-number {
+    font-size: 36px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+  }
+  @media (max-width: 640px) {
+    header.page { align-items: flex-start; }
+    header.page .phone { align-items: flex-start; }
+    header.page .phone .phone-number { font-size: 28px; }
   }
   .toolbar {
     padding: 14px 32px;
@@ -145,6 +174,51 @@ export function renderAdminPage(options: { restaurantName: string; timeZone: str
     gap: 8px;
     position: relative;
   }
+  .card.is-recent {
+    border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+  .card .created {
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .card .created::before {
+    content: "";
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .recent-section {
+    margin-bottom: 32px;
+    padding: 16px;
+    background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
+    border-radius: 12px;
+  }
+  .recent-section h2 {
+    margin: 0 0 12px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .recent-section h2 .count {
+    font-weight: 400;
+    color: var(--ink-faint);
+    text-transform: none;
+    letter-spacing: 0;
+  }
   .card .time {
     font-variant-numeric: tabular-nums;
     font-weight: 600;
@@ -211,9 +285,12 @@ export function renderAdminPage(options: { restaurantName: string; timeZone: str
 <header class="page">
   <div>
     <h1>${restaurantName} · Reservations</h1>
-    <div class="meta">Times shown in ${timeZone}</div>
+    <div class="meta">Times shown in ${timeZone} · <span id="last-updated"></span></div>
   </div>
-  <div class="meta" id="last-updated"></div>
+  <a class="phone" href="tel:${phoneHref}">
+    <span class="phone-label">Reservation line</span>
+    <span class="phone-number">${phone}</span>
+  </a>
 </header>
 <div class="toolbar">
   <div class="group" id="range-filter">
@@ -320,17 +397,46 @@ export function renderAdminPage(options: { restaurantName: string; timeZone: str
     return table.area ? table.name + " (" + table.area + ")" : table.name;
   }
 
-  function renderCard(reservation) {
+  const RECENT_WINDOW_MS = 60 * 60 * 1000;
+
+  function isRecent(reservation, nowMs) {
+    if (!reservation.createdAt) return false;
+    const created = new Date(reservation.createdAt).getTime();
+    return Number.isFinite(created) && nowMs - created <= RECENT_WINDOW_MS && nowMs - created >= 0;
+  }
+
+  function formatRelative(iso, nowMs) {
+    const created = new Date(iso).getTime();
+    const diff = Math.max(0, nowMs - created);
+    if (diff < 45 * 1000) return "just now";
+    const minutes = Math.round(diff / 60000);
+    if (minutes < 60) return minutes + " min ago";
+    const hours = Math.round(minutes / 60);
+    return hours + "h ago";
+  }
+
+  function renderCard(reservation, options) {
+    const opts = options ?? {};
     const tables = reservation.tableIds.map(tableLabel).join(", ");
     const depositLine = formatDeposit(reservation);
     const phone = reservation.phone ? '<span><span class="label">Phone</span> ' + esc(reservation.phone) + '</span>' : "";
     const notes = reservation.notes ? '<div class="notes">' + esc(reservation.notes) + '</div>' : "";
+    const showCreated = opts.showCreated && reservation.createdAt;
+    const createdLine = showCreated
+      ? '  <div class="created">created ' + esc(formatRelative(reservation.createdAt, opts.nowMs ?? Date.now())) + '</div>'
+      : '';
+    const cardClass = opts.highlightRecent ? 'card is-recent' : 'card';
+    const dayLine = opts.showDate
+      ? '  <div class="row"><span><span class="label">Date</span> ' + esc(formatDate(reservation.startsAt)) + '</span></div>'
+      : '';
     return [
-      '<div class="card">',
+      '<div class="' + cardClass + '">',
+      createdLine,
       '  <div class="time">' + esc(formatTime(reservation.startsAt)) + ' – ' + esc(formatTime(reservation.endsAt)),
       '    <span class="duration">' + esc(formatDuration(reservation.durationMinutes)) + '</span>',
       '  </div>',
       '  <div class="guest">' + esc(reservation.guestName) + '</div>',
+      dayLine,
       '  <div class="row">',
       '    <span><span class="label">Party</span> ' + reservation.partySize + '</span>',
       phone,
@@ -342,7 +448,19 @@ export function renderAdminPage(options: { restaurantName: string; timeZone: str
       '  </div>',
       notes,
       '</div>'
-    ].join("\\n");
+    ].filter(Boolean).join("\\n");
+  }
+
+  function renderRecent(reservations, nowMs) {
+    if (reservations.length === 0) return '';
+    const sorted = [...reservations].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    const cards = sorted
+      .map((r) => renderCard(r, { showCreated: true, highlightRecent: true, showDate: true, nowMs }))
+      .join("");
+    return '<section class="recent-section"><h2>Recent · last hour <span class="count">' +
+      sorted.length + ' new</span></h2><div class="grid">' + cards + '</div></section>';
   }
 
   function renderDay(key, reservations) {
@@ -363,10 +481,16 @@ export function renderAdminPage(options: { restaurantName: string; timeZone: str
       .filter((r) => inRange(r, state.range, todayKey, nowMs))
       .filter((r) => matchesSearch(r, term));
 
+    const recent = state.reservations
+      .filter((r) => isRecent(r, nowMs))
+      .filter((r) => matchesSearch(r, term));
+
     stats.textContent = filtered.length + ' of ' + state.reservations.length + ' shown';
 
+    const recentHtml = renderRecent(recent, nowMs);
+
     if (filtered.length === 0) {
-      content.innerHTML = '<div class="empty">No reservations match this view.</div>';
+      content.innerHTML = recentHtml + '<div class="empty">No reservations match this view.</div>';
       return;
     }
 
@@ -379,7 +503,7 @@ export function renderAdminPage(options: { restaurantName: string; timeZone: str
 
     const sortedKeys = [...grouped.keys()].sort();
     const ordered = state.range === "past" ? sortedKeys.reverse() : sortedKeys;
-    content.innerHTML = ordered.map((key) => renderDay(key, grouped.get(key))).join("");
+    content.innerHTML = recentHtml + ordered.map((key) => renderDay(key, grouped.get(key))).join("");
   }
 
   async function load() {

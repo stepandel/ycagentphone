@@ -60,6 +60,7 @@ export type Reservation = {
   stripePaymentIntentId?: string;
   stripePaymentLinkId?: string;
   tableIds: number[];
+  createdAt: string;
 };
 
 export type AvailabilityRequest = {
@@ -105,6 +106,7 @@ type ReservationRow = {
   stripe_checkout_session_id: string | null;
   stripe_payment_intent_id: string | null;
   stripe_payment_link_id: string | null;
+  created_at: string;
 };
 
 type ReservationLogRow = {
@@ -690,7 +692,8 @@ export function getReservation(db: Database, id: string): Reservation {
     stripeCheckoutSessionId: row.stripe_checkout_session_id ?? undefined,
     stripePaymentIntentId: row.stripe_payment_intent_id ?? undefined,
     stripePaymentLinkId: row.stripe_payment_link_id ?? undefined,
-    tableIds: tableRows.map((table) => table.table_id)
+    tableIds: tableRows.map((table) => table.table_id),
+    createdAt: row.created_at
   };
 }
 
@@ -761,7 +764,8 @@ export function listReservations(db: Database, options: ListReservationsOptions 
     stripeCheckoutSessionId: row.stripe_checkout_session_id ?? undefined,
     stripePaymentIntentId: row.stripe_payment_intent_id ?? undefined,
     stripePaymentLinkId: row.stripe_payment_link_id ?? undefined,
-    tableIds: tableMap.get(row.id) ?? []
+    tableIds: tableMap.get(row.id) ?? [],
+    createdAt: row.created_at
   }));
 }
 
