@@ -108,7 +108,11 @@ describe("server", () => {
   });
 
   it("streams an interim response when reservation details are in recent history", async () => {
-    const app = createApp(async () => "Yes, we have room at 7.");
+    let answeredTranscript = "";
+    const app = createApp(async ({ transcript }) => {
+      answeredTranscript = transcript ?? "";
+      return "Yes, we have room at 7.";
+    });
 
     const response = await postSigned(app, "/webhooks/agentphone", {
       channel: "voice",
@@ -127,6 +131,8 @@ describe("server", () => {
       { text: "Of course. Let me check that for you.", interim: true },
       { text: "Yes, we have room at 7." }
     ]);
+    expect(answeredTranscript).toContain("caller: Can I book a table for 4 next Friday?");
+    expect(answeredTranscript).toContain("caller: Yes, that works.");
   });
 
   it("passes hangup controls through normal webhook responses", async () => {

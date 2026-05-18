@@ -49,6 +49,28 @@ describe("extractCallTurn", () => {
     ).toContain("caller: What do you cost?");
   });
 
+  it("keeps recent history when a webhook also includes the latest transcript", () => {
+    expect(
+      extractCallTurn({
+        event: "agent.message",
+        channel: "voice",
+        transcript: "Yes, that works.",
+        recentHistory: [
+          { role: "caller", content: "Can I book a table for 4 next Friday?" },
+          { role: "agent", content: "What time would you like?" },
+          { role: "caller", content: "7pm." }
+        ]
+      }).transcript
+    ).toBe(
+      [
+        "caller: Can I book a table for 4 next Friday?",
+        "agent: What time would you like?",
+        "caller: 7pm.",
+        "caller: Yes, that works."
+      ].join("\n")
+    );
+  });
+
   it("extracts inbound SMS message payloads as text turns", () => {
     expect(
       extractCallTurn({

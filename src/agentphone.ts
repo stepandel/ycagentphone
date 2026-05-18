@@ -66,6 +66,21 @@ function transcriptFromMessages(messages: unknown): string | undefined {
   return turns.length > 0 ? turns.map((turn) => `${turn.role}: ${turn.content}`).join("\n") : undefined;
 }
 
+function combineTranscriptWithHistory(latestTranscript: string | undefined, historyTranscript: string | undefined): string | undefined {
+  if (!historyTranscript) return latestTranscript;
+  if (!latestTranscript) return historyTranscript;
+  if (historyTranscript.includes(latestTranscript)) return historyTranscript;
+  return `${historyTranscript}\ncaller: ${latestTranscript}`;
+}
+
+function firstTranscriptFromMessages(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    const transcript = transcriptFromMessages(value);
+    if (transcript) return transcript;
+  }
+  return undefined;
+}
+
 function transcriptTurnsFromMessages(messages: unknown): TranscriptTurn[] {
   if (!Array.isArray(messages)) return [];
 
@@ -110,29 +125,26 @@ export function extractCallTurn(payload: unknown): CallTurn {
   const message = asRecord(body.message);
   const sms = asRecord(body.sms);
 
-  const transcript =
-    firstString(
-      body.transcript,
-      body.text,
-      body.message,
-      body.input,
-      body.userInput,
-      body.callerTranscript,
-      data.transcript,
-      data.text,
-      data.message,
-      data.body,
-      message.text,
-      message.body,
-      sms.text,
-      sms.body,
-      call.transcript,
-      conversation.transcript
-    ) ??
-    transcriptFromMessages(data.messages) ??
-    transcriptFromMessages(body.messages) ??
-    transcriptFromMessages(conversation.messages) ??
-    transcriptFromMessages(body.recentHistory);
+  const latestTranscript = firstString(
+    body.transcript,
+    body.text,
+    body.message,
+    body.input,
+    body.userInput,
+    body.callerTranscript,
+    data.transcript,
+    data.text,
+    data.message,
+    data.body,
+    message.text,
+    message.body,
+    sms.text,
+    sms.body,
+    call.transcript,
+    conversation.transcript
+  );
+  const historyTranscript = firstTranscriptFromMessages(data.messages, body.messages, conversation.messages, body.recentHistory);
+  const transcript = combineTranscriptWithHistory(latestTranscript, historyTranscript);
   const isCallStart = !transcript && isCallStartPayload(body);
 
   if (!transcript && !isCallStart) {

@@ -7,7 +7,7 @@ import { buildSkillContext } from "./skills/index.js";
 import { isReservationQuery } from "./skills/reservation-taking.js";
 import { observeOpenAIForTurn, withAnswerTrace, withKnowledgeRetrievalTrace } from "./tracing.js";
 import type { VoiceAnswer } from "./agentphone.js";
-import type { ResponseFunctionToolCall, Tool } from "openai/resources/responses/responses";
+import type { ResponseCreateParamsNonStreaming, ResponseFunctionToolCall, Tool } from "openai/resources/responses/responses";
 
 const END_CALL_MARKER = "[[END_CALL]]";
 const END_CALL_TOOL_NAME = "end_call";
@@ -24,6 +24,10 @@ const END_CALL_TOOL: Tool = {
     properties: {}
   },
   strict: true
+};
+
+type PromptCacheResponseCreateParams = ResponseCreateParamsNonStreaming & {
+  prompt_cache_key?: string;
 };
 
 export type AnswerOptions = {
@@ -89,22 +93,27 @@ function getOpenAI(): OpenAI {
 
 export function buildAnswerInputText(context: AnswerPromptContext): string {
   return [
-    context.callId ? `Call ID: ${context.callId}` : undefined,
-    context.caller ? `Caller: ${context.caller}` : undefined,
     `Communication channel: ${context.channel}`,
     context.skillContext ? "Matched call skill context:" : undefined,
     context.skillContext,
+    "Knowledgebase search results:",
+    formatKnowledgeSnippets(context.knowledge),
+    context.callId ? `Call ID: ${context.callId}` : undefined,
+    context.caller ? `Caller: ${context.caller}` : undefined,
     context.reservationLogContext ? "Existing reservation log:" : undefined,
     context.reservationLogContext,
     context.reservationAvailabilityContext ? "SQLite reservation availability:" : undefined,
     context.reservationAvailabilityContext,
-    "Knowledgebase search results:",
-    formatKnowledgeSnippets(context.knowledge),
     "Caller transcript:",
     context.transcript
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+function promptCacheKey(channel: "voice" | "text"): string {
+  const company = config.COMPANY_NAME.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "restaurant";
+  return `agentphone-${company}-${channel}`;
 }
 
 export const answerCaller: AnswerService = async ({ transcript, isCallStart, callId, caller, channel = "voice" }) => withAnswerTrace({ transcript, isCallStart, callId, caller }, async () => {
@@ -118,10 +127,12 @@ export const answerCaller: AnswerService = async ({ transcript, isCallStart, cal
   const reservationLogContext = includeReservationContext ? formatReservationContextForCaller(caller) : undefined;
   const reservationAvailabilityContext = includeReservationContext ? formatAvailabilityContextForTranscript(transcript) : undefined;
 
-  const response = await observeOpenAIForTurn(getOpenAI(), { transcript, isCallStart, callId, caller }).responses.create({
+  const responseParams: PromptCacheResponseCreateParams = {
     model: config.OPENAI_MODEL,
     instructions: buildSystemPrompt(config.COMPANY_NAME, config.PUBLIC_CONTACT_EMAIL),
     ...(channel === "voice" ? { tools: [END_CALL_TOOL], tool_choice: "auto" as const } : {}),
+    prompt_cache_key: promptCacheKey(channel),
+    user: caller,
     input: [
       {
         role: "user",
@@ -142,7 +153,9 @@ export const answerCaller: AnswerService = async ({ transcript, isCallStart, cal
         ]
       }
     ]
-  });
+  };
+
+  const response = await observeOpenAIForTurn(getOpenAI(), { transcript, isCallStart, callId, caller }).responses.create(responseParams);
 
   return parseAnswerControl(response.output_text.trim(), requestedEndCall(response));
 });
