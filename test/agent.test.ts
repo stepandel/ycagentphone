@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { parseAnswerControl } from "../src/agent.js";
+import { buildAnswerInputText, parseAnswerControl } from "../src/agent.js";
 import { buildSystemPrompt } from "../src/prompt.js";
 
 describe("parseAnswerControl", () => {
@@ -21,6 +21,36 @@ describe("parseAnswerControl", () => {
       text: "Thanks for calling. Goodbye.",
       hangup: true
     });
+  });
+});
+
+describe("buildAnswerInputText", () => {
+  it("omits reservation-only context for non-reservation turns", () => {
+    const text = buildAnswerInputText({
+      transcript: "What is the most popular item on the menu?",
+      channel: "voice",
+      knowledge: [{ content: "The cioppino is popular.", source: "kb/menu.md" }]
+    });
+
+    expect(text).toContain("Knowledgebase search results:");
+    expect(text).not.toContain("Matched call skill context:");
+    expect(text).not.toContain("Existing reservation log:");
+    expect(text).not.toContain("SQLite reservation availability:");
+  });
+
+  it("includes reservation context when supplied", () => {
+    const text = buildAnswerInputText({
+      transcript: "Can I reserve a table for two tonight?",
+      channel: "voice",
+      knowledge: [{ content: "Reservations are available.", source: "kb/reservation-availability.md" }],
+      skillContext: "Skill: reservation-taking",
+      reservationLogContext: "No reservation log entry was found for this caller.",
+      reservationAvailabilityContext: "SQLite reservation availability: available."
+    });
+
+    expect(text).toContain("Matched call skill context:");
+    expect(text).toContain("Existing reservation log:");
+    expect(text).toContain("SQLite reservation availability:");
   });
 });
 

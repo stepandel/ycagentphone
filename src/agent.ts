@@ -1,10 +1,11 @@
 import OpenAI from "openai";
 import { config } from "./config.js";
-import { formatKnowledgeSnippets, searchKnowledgebase } from "./memory.js";
+import { formatKnowledgeSnippets, searchKnowledgebase, type KnowledgeSnippet } from "./memory.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { formatReservationLogContextForCaller } from "./reservation-log.js";
 import { formatAvailabilityContextForTranscript } from "./reservation-store.js";
 import { buildSkillContext } from "./skills/index.js";
+import { isReservationQuery } from "./skills/reservation-taking.js";
 import { observeOpenAIForTurn, withAnswerTrace, withKnowledgeRetrievalTrace } from "./tracing.js";
 import type { VoiceAnswer } from "./agentphone.js";
 import type { ResponseFunctionToolCall, Tool } from "openai/resources/responses/responses";
@@ -37,6 +38,17 @@ export type AnswerOptions = {
 export type AnswerResult = string | VoiceAnswer;
 
 export type AnswerService = (options: AnswerOptions) => Promise<AnswerResult>;
+
+export type AnswerPromptContext = {
+  transcript: string;
+  channel: "voice" | "text";
+  knowledge: KnowledgeSnippet[];
+  callId?: string;
+  caller?: string;
+  skillContext?: string;
+  reservationLogContext?: string;
+  reservationAvailabilityContext?: string;
+};
 
 let openai: OpenAI | undefined;
 
@@ -76,15 +88,36 @@ function getOpenAI(): OpenAI {
   return openai;
 }
 
+export function buildAnswerInputText(context: AnswerPromptContext): string {
+  return [
+    context.callId ? `Call ID: ${context.callId}` : undefined,
+    context.caller ? `Caller: ${context.caller}` : undefined,
+    `Communication channel: ${context.channel}`,
+    context.skillContext ? "Matched call skill context:" : undefined,
+    context.skillContext,
+    context.reservationLogContext ? "Existing reservation log:" : undefined,
+    context.reservationLogContext,
+    context.reservationAvailabilityContext ? "SQLite reservation availability:" : undefined,
+    context.reservationAvailabilityContext,
+    "Knowledgebase search results:",
+    formatKnowledgeSnippets(context.knowledge),
+    "Caller transcript:",
+    context.transcript
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 export const answerCaller: AnswerService = async ({ transcript, isCallStart, callId, caller, channel = "voice" }) => withAnswerTrace({ transcript, isCallStart, callId, caller }, async () => {
   if (isCallStart || !transcript?.trim()) {
     return config.RESTAURANT_GREETING;
   }
 
   const knowledge = await withKnowledgeRetrievalTrace(transcript, () => searchKnowledgebase(transcript));
-  const skillContext = buildSkillContext(transcript);
-  const reservationLogContext = await formatReservationLogContextForCaller(caller);
-  const reservationAvailabilityContext = formatAvailabilityContextForTranscript(transcript);
+  const includeReservationContext = isReservationQuery(transcript);
+  const skillContext = includeReservationContext ? buildSkillContext(transcript) : undefined;
+  const reservationLogContext = includeReservationContext ? await formatReservationLogContextForCaller(caller) : undefined;
+  const reservationAvailabilityContext = includeReservationContext ? formatAvailabilityContextForTranscript(transcript) : undefined;
 
   const response = await observeOpenAIForTurn(getOpenAI(), { transcript, isCallStart, callId, caller }).responses.create({
     model: config.OPENAI_MODEL,
@@ -96,23 +129,16 @@ export const answerCaller: AnswerService = async ({ transcript, isCallStart, cal
         content: [
           {
             type: "input_text",
-            text: [
-              callId ? `Call ID: ${callId}` : undefined,
-              caller ? `Caller: ${caller}` : undefined,
-              `Communication channel: ${channel}`,
-              "Matched call skill context:",
+            text: buildAnswerInputText({
+              transcript,
+              channel,
+              callId,
+              caller,
+              knowledge,
               skillContext,
-              "Existing reservation log:",
               reservationLogContext,
-              "SQLite reservation availability:",
-              reservationAvailabilityContext,
-              "Knowledgebase search results:",
-              formatKnowledgeSnippets(knowledge),
-              "Caller transcript:",
-              transcript
-            ]
-              .filter(Boolean)
-              .join("\n")
+              reservationAvailabilityContext
+            })
           }
         ]
       }
