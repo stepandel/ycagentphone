@@ -52,6 +52,10 @@ export async function searchKnowledgebase(query: string): Promise<KnowledgeSnipp
     .filter((snippet) => snippet.content.trim().length > 0);
 }
 
+export async function warmKnowledgebase(): Promise<void> {
+  await loadKnowledgeIndex();
+}
+
 export function formatKnowledgeSnippets(snippets: KnowledgeSnippet[]): string {
   if (snippets.length === 0) {
     return "No matching knowledgebase entries were found.";

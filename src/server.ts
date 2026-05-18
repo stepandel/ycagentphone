@@ -12,6 +12,7 @@ import {
 } from "./agentphone.js";
 import { createPostCallService, type PostCallService } from "./post-call.js";
 import { recordReservationTextFollowUp } from "./reservation-log.js";
+import { warmKnowledgebase } from "./memory.js";
 import {
   listDiningTables,
   listReservations,
@@ -257,6 +258,10 @@ export function createApp(
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   initLangfuseTracing();
+  void warmKnowledgebase().catch((error) => {
+    const message = error instanceof Error ? error.message : "Unknown Moss warmup error.";
+    console.error(`Moss warmup failed: ${message}`);
+  });
   const app = createApp();
   const server = app.listen(config.PORT, config.HOST, () => {
     console.log(`ycagentphone listening on http://${config.HOST}:${config.PORT}`);
