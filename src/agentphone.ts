@@ -58,6 +58,7 @@ function inferChannel(body: UnknownRecord, data: UnknownRecord, message: Unknown
 
   const event = firstString(body.event, body.type, data.event, data.type)?.toLowerCase();
   if (event?.startsWith("message.") || event?.includes("sms")) return "text";
+  if (event === "agent.message" && (Array.isArray(body.recentHistory) || Array.isArray(data.recentHistory))) return "voice";
   return undefined;
 }
 
@@ -143,7 +144,7 @@ export function extractCallTurn(payload: unknown): CallTurn {
     call.transcript,
     conversation.transcript
   );
-  const historyTranscript = firstTranscriptFromMessages(data.messages, body.messages, conversation.messages, body.recentHistory);
+  const historyTranscript = firstTranscriptFromMessages(data.messages, body.messages, conversation.messages, body.recentHistory, data.recentHistory);
   const transcript = combineTranscriptWithHistory(latestTranscript, historyTranscript);
   const isCallStart = !transcript && isCallStartPayload(body);
 

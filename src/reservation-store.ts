@@ -164,6 +164,9 @@ const NUMBER_WORDS: Record<string, number> = {
   twenty: 20
 };
 
+const NUMBER_TEXT_PATTERN =
+  "\\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty";
+
 const WEEKDAY_INDEX: Record<string, number> = {
   sunday: 0,
   monday: 1,
@@ -296,35 +299,63 @@ function restaurantDateTime(year: number, monthIndex: number, day: number, hour:
 function parsePartySizeText(text: string | undefined): number | undefined {
   if (!text) return undefined;
   const normalized = text.toLowerCase();
-  const match = normalized.match(
-    /\b(?:party|table|reservation|booking)\s+(?:of|for)\s+(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)\b/
-  );
-  if (!match) return undefined;
-  return /^\d+$/.test(match[1]) ? Number(match[1]) : NUMBER_WORDS[match[1]];
+  const patterns = [
+    new RegExp(`\\b(?:party|table|reservation|booking)\\s+(?:of|for)\\s+(${NUMBER_TEXT_PATTERN})\\b`),
+    new RegExp(`\\b(${NUMBER_TEXT_PATTERN})\\s+(?:people|guests?|diners)\\b`),
+    new RegExp(`\\bfor\\s+(?:the\\s+)?(${NUMBER_TEXT_PATTERN})\\s+of\\s+you\\b`)
+  ];
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    if (match) return parseNumberText(match[1]);
+  }
+  return undefined;
+}
+
+function parseNumberText(value: string): number {
+  return /^\d+$/.test(value) ? Number(value) : NUMBER_WORDS[value];
+}
+
+function normalizeReservationHour(hour: number, meridiem: string | undefined): number {
+  if (meridiem === "pm" && hour < 12) return hour + 12;
+  if (meridiem === "am" && hour === 12) return 0;
+  if (!meridiem && hour >= 1 && hour <= 11) return hour + 12;
+  return hour;
 }
 
 function parseRequestedTime(text: string): { hour: number; minute: number } | undefined {
   const matches = text.matchAll(/\b(?:(at|around|for|by)\s*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/gi);
-  const candidates: { hour: number; minute: number; hasMeridiem: boolean; prefix?: string }[] = [];
+  const candidates: { hour: number; minute: number; hasMeridiem: boolean; isOClock: boolean; prefix?: string }[] = [];
   for (const match of matches) {
     if (!match[1] && !match[4]) continue;
     let hour = Number(match[2]);
     const minute = Number(match[3] ?? "0");
     const meridiem = match[4]?.toLowerCase();
     if (hour > 23 || minute > 59) continue;
-    if (meridiem === "pm" && hour < 12) hour += 12;
-    if (meridiem === "am" && hour === 12) hour = 0;
-    if (!meridiem && hour >= 1 && hour <= 11) hour += 12;
     candidates.push({
-      hour,
+      hour: normalizeReservationHour(hour, meridiem),
       minute,
       hasMeridiem: Boolean(meridiem),
+      isOClock: false,
       prefix: match[1]?.toLowerCase()
+    });
+  }
+
+  const oClockMatches = text.matchAll(new RegExp(`\\b(${NUMBER_TEXT_PATTERN})\\s*o(?:'|’)?clock\\s*(am|pm)?\\b`, "gi"));
+  for (const match of oClockMatches) {
+    const rawHour = parseNumberText(match[1].toLowerCase());
+    const meridiem = match[2]?.toLowerCase();
+    if (rawHour > 23) continue;
+    candidates.push({
+      hour: normalizeReservationHour(rawHour, meridiem),
+      minute: 0,
+      hasMeridiem: Boolean(meridiem),
+      isOClock: true
     });
   }
 
   return (
     candidates.find((candidate) => candidate.hasMeridiem) ??
+    candidates.find((candidate) => candidate.isOClock) ??
     candidates.find((candidate) => candidate.prefix && candidate.prefix !== "for")
   );
 }

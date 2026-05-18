@@ -13,8 +13,8 @@ describe("reservation-taking skill", () => {
     const context = buildSkillContext("I need a private room for 12 people");
 
     expect(context).toContain("Skill: reservation-taking");
-    expect(context).toContain("SQLite reservation availability is the source of truth");
-    expect(context).toContain("If SQLite availability says the request is not yet parseable");
+    expect(context).toContain("check_reservation_availability tool is the source of truth");
+    expect(context).toContain("If party size, date, or time is missing");
     expect(context).not.toContain("Mock availability table for the next 14 days");
     expect(context).not.toContain("2026-05-30 | 8 | 4 | 0");
     expect(context).not.toContain("Indoor seats available");
@@ -31,7 +31,7 @@ describe("reservation-taking skill", () => {
     expect(context).toContain("pending, paid, failed, refunded, or waived");
     expect(context).toContain("BYOW is allowed");
     expect(context).toContain("Bring-your-own cake is allowed");
-    expect(context).toContain("use the SQLite reservation availability context");
+    expect(context).toContain("call check_reservation_availability");
     expect(context).toContain("Taking reservations by phone is allowed");
     expect(context).toContain("Say yes and proceed with the reservation workflow");
     expect(context).toContain("Essential details: guest name, party size, preferred date");

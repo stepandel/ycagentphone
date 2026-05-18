@@ -135,6 +135,26 @@ describe("server", () => {
     expect(answeredTranscript).toContain("caller: Yes, that works.");
   });
 
+  it("streams an interim response for AgentPhone voice history even when channel is omitted", async () => {
+    const app = createApp(async () => "Yes, we have room at 7.");
+
+    const response = await postSigned(app, "/webhooks/agentphone", {
+      event: "agent.message",
+      recentHistory: [
+        { direction: "inbound", content: "Can I book a table for 4 next Friday?" },
+        { direction: "outbound", content: "What time would you like?" },
+        { direction: "inbound", content: "7pm." }
+      ]
+    }).expect(200);
+
+    const lines = response.text.trim().split("\n").map((line) => JSON.parse(line));
+    expect(response.headers["content-type"]).toContain("application/x-ndjson");
+    expect(lines).toEqual([
+      { text: "Of course. Let me check that for you.", interim: true },
+      { text: "Yes, we have room at 7." }
+    ]);
+  });
+
   it("passes hangup controls through normal webhook responses", async () => {
     const app = createApp(async () => ({ text: "Thanks for calling. Goodbye.", hangup: true }));
 

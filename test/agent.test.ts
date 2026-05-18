@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { buildAnswerInputText, parseAnswerControl } from "../src/agent.js";
+import { buildAnswerInputText, checkReservationAvailabilityTool, parseAnswerControl } from "../src/agent.js";
 import { buildSystemPrompt } from "../src/prompt.js";
 
 describe("parseAnswerControl", () => {
@@ -33,6 +33,8 @@ describe("buildAnswerInputText", () => {
     });
 
     expect(text).toContain("Knowledgebase search results:");
+    expect(text).toContain("Current restaurant date:");
+    expect(text).toContain("Restaurant time zone:");
     expect(text).not.toContain("Matched call skill context:");
     expect(text).not.toContain("Existing reservation log:");
     expect(text).not.toContain("SQLite reservation availability:");
@@ -51,6 +53,31 @@ describe("buildAnswerInputText", () => {
     expect(text).toContain("Matched call skill context:");
     expect(text).toContain("Existing reservation log:");
     expect(text).toContain("SQLite reservation availability:");
+  });
+});
+
+describe("checkReservationAvailabilityTool", () => {
+  it("returns live reservation availability for structured details", () => {
+    const result = JSON.parse(
+      checkReservationAvailabilityTool(
+        JSON.stringify({
+          partySize: 8,
+          date: "2026-05-21",
+          time: "18:00"
+        })
+      )
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.summary).toContain("SQLite reservation availability for 2026-05-21 18:00-19:15");
+    expect(result.summary).toContain("Party size: 8");
+  });
+
+  it("returns a structured error for invalid arguments", () => {
+    const result = JSON.parse(checkReservationAvailabilityTool(JSON.stringify({ partySize: 8, date: "Thursday", time: "six" })));
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("date must use YYYY-MM-DD format");
   });
 });
 

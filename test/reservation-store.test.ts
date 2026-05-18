@@ -192,6 +192,21 @@ describe("reservation store", () => {
     expect(partySizeBeforeTime.partySize).toBe(8);
     expect(partySizeBeforeTime.startsAt?.toISOString()).toBe("2026-05-22T01:00:00.000Z");
 
+    const spokenTurnTranscript = parseReservationRequestText(
+      [
+        "caller: Can I make a reservation, please?",
+        "agent: What date would you like to come in?",
+        "caller: Thursday.",
+        "agent: How many guests will be joining you?",
+        "caller: There'll be eight people.",
+        "agent: What time would you prefer for the eight of you this Thursday?",
+        "caller: Six o'clock."
+      ].join("\n"),
+      now
+    );
+    expect(spokenTurnTranscript.partySize).toBe(8);
+    expect(spokenTurnTranscript.startsAt?.toISOString()).toBe("2026-05-22T01:00:00.000Z");
+
     expect(parseReservationDateTime("May 22", "7:30 PM", now)?.toISOString()).toBe("2026-05-23T02:30:00.000Z");
   });
 });

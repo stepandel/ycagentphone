@@ -49,6 +49,22 @@ describe("extractCallTurn", () => {
     ).toContain("caller: What do you cost?");
   });
 
+  it("infers voice channel from AgentPhone recentHistory when channel is omitted", () => {
+    expect(
+      extractCallTurn({
+        event: "agent.message",
+        recentHistory: [
+          { direction: "inbound", content: "Can I book a table for 4 next Friday?" },
+          { direction: "outbound", content: "What time would you like?" },
+          { direction: "inbound", content: "7pm." }
+        ]
+      })
+    ).toMatchObject({
+      channel: "voice",
+      transcript: "caller: Can I book a table for 4 next Friday?\nagent: What time would you like?\ncaller: 7pm."
+    });
+  });
+
   it("keeps recent history when a webhook also includes the latest transcript", () => {
     expect(
       extractCallTurn({

@@ -16,11 +16,12 @@ export const reservationTakingSkill: AgentSkill = {
 Skill: reservation-taking
 
 Authority:
-- SQLite reservation availability is the source of truth for dates, times, table inventory, table blocks, existing reservations, and deposit status.
+- The check_reservation_availability tool is the source of truth for live dates, times, table inventory, table blocks, existing reservations, and deposit status.
 - Taking reservations by phone is allowed when this skill is matched. Say yes and proceed with the reservation workflow.
-- For any party size, use the SQLite reservation availability context when it includes a parseable party size, date, and time. If it says the requested slot is available, tell the guest you have them down for that reservation.
-- If SQLite availability says the request is not yet parseable, collect the missing party size, date, or time before making an availability claim.
-- If SQLite availability says the requested time is unavailable, offer the closest sensible alternative only if one is present in the provided context; otherwise ask for another nearby time or say a human can follow up.
+- For any party size, call check_reservation_availability once you have party size, date, and time. Resolve relative dates using the current restaurant date in the input, and pass a restaurant-local YYYY-MM-DD date and 24-hour HH:MM time.
+- If the tool says the requested slot is available, tell the guest you have them down for that reservation.
+- If party size, date, or time is missing, collect the missing detail before making an availability claim.
+- If the tool says the requested time is unavailable, offer the closest sensible alternative only if one is present in the tool result; otherwise ask for another nearby time or say a human can follow up.
 - For larger parties, private rooms, allergies, accessibility needs, or unusual special requests, use best judgment to collect the request and explain that a human may follow up to confirm details, deposits, or accommodations.
 - Ask reservation questions one at a time. Do not interrogate the caller with the full checklist at once.
 
@@ -32,7 +33,7 @@ Reservation intake:
 - Before ending the call, give a short confirmation with name, party size, date, time, and any important special note. Do not repeat every optional field.
 - For standard parties with an available slot, use direct reservation language such as "I have you down for..." or "You're all set for..."
 - All reservations require a deposit through a Stripe link sent after the call. Parties of 10 or fewer require a $20 deposit. Parties over 10 require a $100 deposit. Do not collect payment by phone.
-- If the exact requested time or seating is not available, use SQLite availability context to explain the tradeoff briefly. Do not invent alternate times, table counts, room availability, or capacity.
+- If the exact requested time or seating is not available, use the check_reservation_availability tool result to explain the tradeoff briefly. Do not invent alternate times, table counts, room availability, or capacity.
 - If the guest declines to provide more information, says they need to go, or treats the call as complete, stop asking questions. Briefly summarize what was collected, say any missing details can be handled in follow-up if contact information is available, and end the call.
 - BYOW is allowed. Bring-your-own cake is allowed. Include either request in the confirmation summary.
 
