@@ -169,6 +169,21 @@ export function reservationDepositForPartySize(partySize: string | undefined): R
   };
 }
 
+export function stripeClientReferenceForReservation(reservationId: string): string {
+  return reservationId.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 200);
+}
+
+export function paymentLinkWithReservationReference(paymentLinkUrl: string | undefined, reservationId: string): string | undefined {
+  if (!paymentLinkUrl) return undefined;
+  try {
+    const url = new URL(paymentLinkUrl);
+    url.searchParams.set("client_reference_id", stripeClientReferenceForReservation(reservationId));
+    return url.toString();
+  } catch {
+    return paymentLinkUrl;
+  }
+}
+
 export async function extractPostCallSummary(call: PostCallWebhook): Promise<PostCallSummary> {
   const response = await getOpenAI().responses.create({
     model: config.OPENAI_MODEL,
@@ -241,16 +256,26 @@ export function createPostCallService(
       return { sent: false, reason: "Call did not include a reservation request.", summary };
     }
 
-    const deposit = reservationDepositForPartySize(summary.reservation.partySize);
+    const createdAt = new Date().toISOString();
+    const baseDeposit = reservationDepositForPartySize(summary.reservation.partySize);
+    const entry = createReservationLogEntry({
+      callId: call.callId,
+      caller: call.caller,
+      conversationContext: summary.conversationContext,
+      reservation: summary.reservation,
+      deposit: baseDeposit,
+      createdAt
+    });
+    const deposit = {
+      ...baseDeposit,
+      paymentLinkUrl: paymentLinkWithReservationReference(baseDeposit.paymentLinkUrl, entry.id)
+    };
 
     await reservationLogWriter(
-      createReservationLogEntry({
-        callId: call.callId,
-        caller: call.caller,
-        conversationContext: summary.conversationContext,
-        reservation: summary.reservation,
+      {
+        ...entry,
         deposit
-      })
+      }
     );
 
     const message = formatReservationConfirmationMessage(summary, deposit);

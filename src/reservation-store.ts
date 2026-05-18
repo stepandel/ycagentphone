@@ -1135,6 +1135,24 @@ export function updateReservationDepositStatusForStripeReference(
     paidAt?: string | Date;
   }
 ): Reservation | undefined {
+  const reservation = findReservationByStripeReference(db, input);
+  if (!reservation) return undefined;
+  return updateReservationDepositStatus(db, {
+    reservationId: reservation.id,
+    depositStatus: input.depositStatus,
+    paidAt: input.paidAt,
+    stripeCheckoutSessionId: input.stripeCheckoutSessionId,
+    stripePaymentIntentId: input.stripePaymentIntentId
+  });
+}
+
+export function findReservationByStripeReference(
+  db: Database,
+  input: {
+    stripeCheckoutSessionId?: string;
+    stripePaymentIntentId?: string;
+  }
+): Reservation | undefined {
   const row = db
     .query<{ id: string }, [string | null, string | null, string | null, string | null]>(
       `
@@ -1153,14 +1171,7 @@ export function updateReservationDepositStatusForStripeReference(
       input.stripePaymentIntentId ?? null
     );
 
-  if (!row) return undefined;
-  return updateReservationDepositStatus(db, {
-    reservationId: row.id,
-    depositStatus: input.depositStatus,
-    paidAt: input.paidAt,
-    stripeCheckoutSessionId: input.stripeCheckoutSessionId,
-    stripePaymentIntentId: input.stripePaymentIntentId
-  });
+  return row ? getReservation(db, row.id) : undefined;
 }
 
 export function blockTable(db: Database, input: { tableId?: number; startsAt: string | Date; endsAt: string | Date; reason?: string }): number {

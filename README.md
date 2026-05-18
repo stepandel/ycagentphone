@@ -129,6 +129,14 @@ bun run configure:stripe
 
 The script requires `STRIPE_SECRET_KEY=sk_test_...`, creates a test-mode reservation deposit Payment Link using `STRIPE_RESERVATION_DEPOSIT_AMOUNT_CENTS` or the `$20` standard deposit by default, and writes `STRIPE_RESERVATION_PAYMENT_LINK_URL` into `.env`. For production-like behavior, configure separate `STRIPE_STANDARD_RESERVATION_PAYMENT_LINK_URL` and `STRIPE_LARGE_PARTY_RESERVATION_PAYMENT_LINK_URL` links for the `$20` and `$100` deposits.
 
+Configure Stripe to send `checkout.session.completed` events to:
+
+```text
+${AGENTPHONE_WEBHOOK_BASE_URL}/webhooks/stripe
+```
+
+Set the endpoint signing secret as `STRIPE_WEBHOOK_SECRET=whsec_...`. Reservation SMS links include a Stripe Payment Link `client_reference_id`, which the Stripe webhook uses to mark the matching reservation deposit paid in the admin UI and send the guest a payment confirmation text.
+
 The webhook parser accepts several common payload shapes, including:
 
 ```json

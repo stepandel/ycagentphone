@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { createPostCallService, formatReservationConfirmationMessage, reservationDepositForPartySize } from "../src/post-call.js";
+import {
+  createPostCallService,
+  formatReservationConfirmationMessage,
+  paymentLinkWithReservationReference,
+  reservationDepositForPartySize
+} from "../src/post-call.js";
 import type { ReservationLogEntry } from "../src/post-call.js";
 
 describe("formatReservationConfirmationMessage", () => {
@@ -78,6 +83,15 @@ describe("formatReservationConfirmationMessage", () => {
     expect(reservationDepositForPartySize("10 guests").amountLabel).toBe("$20");
     expect(reservationDepositForPartySize("11 guests").amountLabel).toBe("$100");
   });
+
+  it("adds the reservation reference to Stripe Payment Links", () => {
+    expect(paymentLinkWithReservationReference("https://buy.stripe.com/test_123", "call_123")).toBe(
+      "https://buy.stripe.com/test_123?client_reference_id=call_123"
+    );
+    expect(paymentLinkWithReservationReference("https://buy.stripe.com/test_123?prefilled_email=a%40b.com", "call:123")).toBe(
+      "https://buy.stripe.com/test_123?prefilled_email=a%40b.com&client_reference_id=call_123"
+    );
+  });
 });
 
 describe("createPostCallService", () => {
@@ -134,6 +148,9 @@ describe("createPostCallService", () => {
         })
       })
     ]);
+    if (logged[0]?.deposit?.paymentLinkUrl) {
+      expect(logged[0].deposit.paymentLinkUrl).toContain("client_reference_id=call_123");
+    }
   });
 
   it("does not send when the call was not a reservation request", async () => {

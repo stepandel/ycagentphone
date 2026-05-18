@@ -46,6 +46,7 @@ const envSchema = z.object({
   AGENTPHONE_AGENT_ID: optionalNonEmptyString,
   AGENTPHONE_BASE_URL: agentPhoneBaseUrl,
   STRIPE_SECRET_KEY: optionalNonEmptyString,
+  STRIPE_WEBHOOK_SECRET: optionalNonEmptyString,
   STRIPE_RESERVATION_PAYMENT_LINK_URL: optionalUrl,
   STRIPE_STANDARD_RESERVATION_PAYMENT_LINK_URL: optionalUrl,
   STRIPE_LARGE_PARTY_RESERVATION_PAYMENT_LINK_URL: optionalUrl,

@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import express, { type Request } from "express";
 import { config } from "./config.js";
 import { renderAdminPage } from "./admin-page.js";
@@ -15,11 +16,15 @@ import { warmKnowledgebase } from "./memory.js";
 import {
   appendReservationNoteByCaller,
   deleteReservation,
+  findReservationByStripeReference,
+  getReservation,
   listDiningTables,
   listReservations,
   openReservationDatabase,
   parseReservationRequestText,
-  seedDiningTables
+  seedDiningTables,
+  updateReservationDepositStatus,
+  type Reservation
 } from "./reservation-store.js";
 import { extractReservationUpdatesFromText } from "./reservation-text.js";
 import { isReservationQuery } from "./skills/reservation-taking.js";
@@ -30,6 +35,14 @@ type RawBodyRequest = Request & {
 };
 
 type TextReplySender = (options: { toNumber: string; body: string; numberId?: string }) => Promise<unknown>;
+
+type StripeWebhookEvent = {
+  id?: string;
+  type?: string;
+  data?: {
+    object?: Record<string, unknown>;
+  };
+};
 
 function bodyChannel(body: unknown): string | undefined {
   if (typeof body !== "object" || body === null) return undefined;
@@ -56,6 +69,74 @@ function answerChunk(answer: AnswerResult) {
 
 function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  const aBuffer = Buffer.from(a);
+  const bBuffer = Buffer.from(b);
+  return aBuffer.length === bBuffer.length && crypto.timingSafeEqual(aBuffer, bBuffer);
+}
+
+function verifyStripeSignature(rawBody: Buffer, signatureHeader: unknown, secret: string | undefined): boolean {
+  if (!secret) return true;
+  const header = Array.isArray(signatureHeader) ? signatureHeader[0] : signatureHeader;
+  if (typeof header !== "string") return false;
+
+  const parts = header.split(",").map((part) => part.trim().split("="));
+  const timestamp = parts.find(([key]) => key === "t")?.[1];
+  const signatures = parts.filter(([key]) => key === "v1").map(([, value]) => value).filter(Boolean);
+  if (!timestamp || signatures.length === 0) return false;
+
+  const timestampSeconds = Number(timestamp);
+  if (!Number.isFinite(timestampSeconds)) return false;
+  const ageSeconds = Math.abs(Date.now() / 1000 - timestampSeconds);
+  if (ageSeconds > 5 * 60) return false;
+
+  const expected = crypto.createHmac("sha256", secret).update(`${timestamp}.${rawBody.toString("utf8")}`).digest("hex");
+  return signatures.some((signature) => timingSafeEqual(signature, expected));
+}
+
+function asString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function stripePaymentLinkId(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  const record = asRecord(value);
+  return asString(record.id);
+}
+
+function stripePaidAt(session: Record<string, unknown>): string | undefined {
+  const timestamp = typeof session.created === "number" ? session.created : undefined;
+  return timestamp ? new Date(timestamp * 1000).toISOString() : undefined;
+}
+
+function findReservationForStripeSession(db: ReturnType<typeof openReservationDatabase>, session: Record<string, unknown>): Reservation | undefined {
+  const clientReferenceId = asString(session.client_reference_id);
+  if (clientReferenceId) {
+    try {
+      return getReservation(db, clientReferenceId);
+    } catch {
+      // Fall back to Stripe object references below.
+    }
+  }
+
+  return findReservationByStripeReference(db, {
+    stripeCheckoutSessionId: asString(session.id),
+    stripePaymentIntentId: asString(session.payment_intent)
+  });
+}
+
+function formatStripePaymentConfirmation(reservation: Reservation): string {
+  const amount =
+    reservation.depositAmountCents && reservation.depositCurrency
+      ? ` ${new Intl.NumberFormat("en-US", {
+          style: "currency",
+          currency: reservation.depositCurrency.toUpperCase(),
+          maximumFractionDigits: reservation.depositAmountCents % 100 === 0 ? 0 : 2
+        }).format(reservation.depositAmountCents / 100)}`
+      : "";
+  return `Thanks, your${amount} reservation deposit is paid. Your reservation at ${config.COMPANY_NAME} is confirmed.`;
 }
 
 function textFromTranscriptMessages(value: unknown): string | undefined {
@@ -214,6 +295,67 @@ export function createApp(
       res.json({ ok: true, id: req.params.id });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to delete reservation.";
+      console.error(message);
+      res.status(500).json({ error: message });
+    } finally {
+      db.close();
+    }
+  });
+
+  app.post("/webhooks/stripe", async (req: RawBodyRequest, res) => {
+    if (!verifyStripeSignature(req.rawBody ?? Buffer.from(""), req.headers["stripe-signature"], config.STRIPE_WEBHOOK_SECRET)) {
+      res.status(401).json({ error: "Invalid Stripe webhook signature." });
+      return;
+    }
+
+    const event = req.body as StripeWebhookEvent;
+    if (event.type !== "checkout.session.completed") {
+      res.json({ received: true, ignored: true });
+      return;
+    }
+
+    const session = asRecord(event.data?.object);
+    const db = openReservationDatabase();
+    try {
+      const existing = findReservationForStripeSession(db, session);
+      if (!existing) {
+        res.status(202).json({
+          received: true,
+          matched: false,
+          eventId: event.id,
+          checkoutSessionId: asString(session.id)
+        });
+        return;
+      }
+
+      const wasPaid = existing.depositStatus === "paid";
+      const reservation = wasPaid
+        ? existing
+        : updateReservationDepositStatus(db, {
+            reservationId: existing.id,
+            depositStatus: "paid",
+            paidAt: stripePaidAt(session),
+            stripeCheckoutSessionId: asString(session.id),
+            stripePaymentIntentId: asString(session.payment_intent),
+            stripePaymentLinkId: stripePaymentLinkId(session.payment_link)
+          });
+
+      if (!wasPaid && reservation.phone) {
+        await textReplySender({
+          toNumber: reservation.phone,
+          body: formatStripePaymentConfirmation(reservation)
+        });
+      }
+
+      res.json({
+        received: true,
+        matched: true,
+        reservationId: reservation.id,
+        depositStatus: reservation.depositStatus,
+        confirmationSent: Boolean(!wasPaid && reservation.phone)
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown Stripe webhook error.";
       console.error(message);
       res.status(500).json({ error: message });
     } finally {
