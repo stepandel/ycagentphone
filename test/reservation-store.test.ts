@@ -188,6 +188,10 @@ describe("reservation store", () => {
     expect(request.partySize).toBe(4);
     expect(request.startsAt?.toISOString()).toBe("2026-05-23T02:00:00.000Z");
 
+    const partySizeBeforeTime = parseReservationRequestText("Can I make a reservation for 8 this Thursday at 6 PM?", now);
+    expect(partySizeBeforeTime.partySize).toBe(8);
+    expect(partySizeBeforeTime.startsAt?.toISOString()).toBe("2026-05-22T01:00:00.000Z");
+
     expect(parseReservationDateTime("May 22", "7:30 PM", now)?.toISOString()).toBe("2026-05-23T02:30:00.000Z");
   });
 });

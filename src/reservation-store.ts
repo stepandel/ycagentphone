@@ -305,6 +305,7 @@ function parsePartySizeText(text: string | undefined): number | undefined {
 
 function parseRequestedTime(text: string): { hour: number; minute: number } | undefined {
   const matches = text.matchAll(/\b(?:(at|around|for|by)\s*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/gi);
+  const candidates: { hour: number; minute: number; hasMeridiem: boolean; prefix?: string }[] = [];
   for (const match of matches) {
     if (!match[1] && !match[4]) continue;
     let hour = Number(match[2]);
@@ -314,9 +315,18 @@ function parseRequestedTime(text: string): { hour: number; minute: number } | un
     if (meridiem === "pm" && hour < 12) hour += 12;
     if (meridiem === "am" && hour === 12) hour = 0;
     if (!meridiem && hour >= 1 && hour <= 11) hour += 12;
-    return { hour, minute };
+    candidates.push({
+      hour,
+      minute,
+      hasMeridiem: Boolean(meridiem),
+      prefix: match[1]?.toLowerCase()
+    });
   }
-  return undefined;
+
+  return (
+    candidates.find((candidate) => candidate.hasMeridiem) ??
+    candidates.find((candidate) => candidate.prefix && candidate.prefix !== "for")
+  );
 }
 
 function parseRequestedDate(text: string, now: Date): { year: number; monthIndex: number; day: number } | undefined {
