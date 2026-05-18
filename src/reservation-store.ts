@@ -872,6 +872,97 @@ export function listReservations(db: Database, options: ListReservationsOptions 
   }));
 }
 
+function normalizePhone(value: string): string {
+  return value.replace(/[^\d+]/g, "");
+}
+
+function parsePartySizeFromExtraction(value: string | undefined): number | undefined {
+  const match = value?.match(/\d+/);
+  return match ? Number(match[0]) : undefined;
+}
+
+export function callReservationId(callId: string | undefined, caller: string, createdAt: string): string {
+  if (callId) return callId;
+  const normalizedCaller = normalizePhone(caller).replace(/^\+/, "") || "unknown";
+  return `reservation_${normalizedCaller}_${createdAt.replace(/[^0-9]/g, "")}`;
+}
+
+export type CallReservationExtraction = {
+  guestName?: string;
+  partySize?: string;
+  day?: string;
+  time?: string;
+  specialNotes?: string;
+};
+
+export type CallReservationDeposit = {
+  amountCents?: number;
+  currency?: string;
+  paymentLinkUrl?: string;
+};
+
+export type RecordReservationCallInput = {
+  id?: string;
+  callId?: string;
+  caller: string;
+  conversationContext?: string;
+  reservation: CallReservationExtraction;
+  deposit?: CallReservationDeposit;
+  createdAt?: string;
+};
+
+export type RecordReservationCallResult =
+  | { recorded: true; reservation: Reservation }
+  | { recorded: false; reason: "missing-date-or-party" | "duplicate" };
+
+export function recordReservationCall(input: RecordReservationCallInput): RecordReservationCallResult {
+  const createdAt = input.createdAt ?? new Date().toISOString();
+  const partySize = parsePartySizeFromExtraction(input.reservation.partySize);
+  const startsAt = parseReservationDateTime(input.reservation.day, input.reservation.time, new Date(createdAt));
+  if (!startsAt || !partySize) return { recorded: false, reason: "missing-date-or-party" };
+
+  const id = input.id ?? callReservationId(input.callId, input.caller, createdAt);
+  const db = openReservationDatabase();
+  try {
+    seedDiningTables(db);
+    if (db.query<{ id: string }, [string]>("SELECT id FROM reservations WHERE id = ?").get(id)) {
+      return { recorded: false, reason: "duplicate" };
+    }
+    const reservation = createReservation(db, {
+      id,
+      sourceCallId: input.callId,
+      guestName: input.reservation.guestName ?? "Unknown guest",
+      phone: input.caller,
+      partySize,
+      startsAt,
+      notes: [input.reservation.specialNotes, input.conversationContext].filter(Boolean).join("; ") || undefined,
+      depositAmountCents: input.deposit?.amountCents,
+      depositCurrency: input.deposit?.currency,
+      depositPaymentLinkUrl: input.deposit?.paymentLinkUrl,
+      depositStatus: input.deposit ? "pending" : "not_required",
+      createdAt
+    });
+    return { recorded: true, reservation };
+  } finally {
+    db.close();
+  }
+}
+
+export function appendReservationNoteByCaller(caller: string | undefined, note: string): Reservation | undefined {
+  if (!caller || !note.trim()) return undefined;
+  const db = openReservationDatabase();
+  try {
+    const latest = findLatestReservationByPhone(db, caller);
+    if (!latest) return undefined;
+    const trimmed = note.trim();
+    const combined = latest.notes ? `${latest.notes}; ${trimmed}` : trimmed;
+    db.prepare("UPDATE reservations SET notes = ?, updated_at = ? WHERE id = ?").run(combined, new Date().toISOString(), latest.id);
+    return getReservation(db, latest.id);
+  } finally {
+    db.close();
+  }
+}
+
 export function formatReservationContextForCaller(caller: string | undefined): string {
   if (!caller) return "No caller phone number was provided for reservation lookup.";
   const db = openReservationDatabase();

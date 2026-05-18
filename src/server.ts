@@ -11,9 +11,9 @@ import {
   verifyAgentPhoneSignature
 } from "./agentphone.js";
 import { createPostCallService, type PostCallService } from "./post-call.js";
-import { recordReservationTextFollowUp } from "./reservation-log.js";
 import { warmKnowledgebase } from "./memory.js";
 import {
+  appendReservationNoteByCaller,
   deleteReservation,
   listDiningTables,
   listReservations,
@@ -107,15 +107,28 @@ function isTextFollowUp(req: Request, turn: ReturnType<typeof extractCallTurn>):
 async function recordTextFollowUp(req: Request, turn: ReturnType<typeof extractCallTurn>): Promise<void> {
   if (!isTextFollowUp(req, turn)) return;
   try {
-    await recordReservationTextFollowUp({
-      caller: turn.caller,
-      transcript: turn.transcript,
-      reservationUpdates: extractReservationUpdatesFromText(turn.transcript ?? "")
-    });
+    const transcript = turn.transcript?.trim();
+    if (!transcript) return;
+    const updates = extractReservationUpdatesFromText(transcript);
+    const updateSummary = formatReservationUpdateSummary(updates);
+    const note = updateSummary ? `text follow-up: ${transcript} (${updateSummary})` : `text follow-up: ${transcript}`;
+    appendReservationNoteByCaller(turn.caller, note);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown reservation log error.";
-    console.error(`Reservation text follow-up log failed: ${message}`);
+    const message = error instanceof Error ? error.message : "Unknown reservation note error.";
+    console.error(`Reservation text follow-up note failed: ${message}`);
   }
+}
+
+function formatReservationUpdateSummary(updates: ReturnType<typeof extractReservationUpdatesFromText>): string | undefined {
+  if (!updates) return undefined;
+  const parts = [
+    updates.guestName ? `guest name -> ${updates.guestName}` : undefined,
+    updates.partySize ? `party size -> ${updates.partySize}` : undefined,
+    updates.day ? `date -> ${updates.day}` : undefined,
+    updates.time ? `time -> ${updates.time}` : undefined,
+    updates.specialNotes ? `notes -> ${updates.specialNotes}` : undefined
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join("; ") : undefined;
 }
 
 async function answerAndSendTextReply(

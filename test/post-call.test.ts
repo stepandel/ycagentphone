@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { createPostCallService, formatReservationConfirmationMessage, reservationDepositForPartySize } from "../src/post-call.js";
-import type { ReservationLogEntry } from "../src/reservation-log.js";
+import type { ReservationLogEntry } from "../src/post-call.js";
 
 describe("formatReservationConfirmationMessage", () => {
   it("formats brief reservation details for the caller", () => {

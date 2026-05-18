@@ -5,7 +5,7 @@ import {
   type PostCallWebhook,
   type SendAgentPhoneMessageOptions
 } from "./agentphone.js";
-import { appendReservationLogEntry, createReservationLogEntry, type ReservationLogEntry } from "./reservation-log.js";
+import { callReservationId, recordReservationCall } from "./reservation-store.js";
 
 export type ReservationDetails = {
   guestName?: string;
@@ -14,6 +14,54 @@ export type ReservationDetails = {
   time?: string;
   specialNotes?: string;
 };
+
+export type ReservationLogEntry = {
+  id: string;
+  callId?: string;
+  caller: string;
+  createdAt: string;
+  conversationContext?: string;
+  reservation: ReservationDetails;
+  deposit?: ReservationDeposit;
+};
+
+export function createReservationLogEntry(input: {
+  callId?: string;
+  caller: string;
+  conversationContext?: string;
+  reservation: ReservationDetails;
+  deposit?: ReservationDeposit;
+  createdAt?: string;
+}): ReservationLogEntry {
+  const createdAt = input.createdAt ?? new Date().toISOString();
+  return {
+    id: callReservationId(input.callId, input.caller, createdAt),
+    callId: input.callId,
+    caller: input.caller,
+    createdAt,
+    conversationContext: input.conversationContext,
+    reservation: input.reservation,
+    deposit: input.deposit
+  };
+}
+
+async function defaultReservationRecorder(entry: ReservationLogEntry): Promise<void> {
+  recordReservationCall({
+    id: entry.id,
+    callId: entry.callId,
+    caller: entry.caller,
+    conversationContext: entry.conversationContext,
+    reservation: entry.reservation,
+    deposit: entry.deposit
+      ? {
+          amountCents: entry.deposit.amountCents,
+          currency: entry.deposit.currency,
+          paymentLinkUrl: entry.deposit.paymentLinkUrl
+        }
+      : undefined,
+    createdAt: entry.createdAt
+  });
+}
 
 export type PostCallSummary = {
   shouldSend: boolean;
@@ -181,7 +229,7 @@ export function createPostCallService(
       agentId: config.AGENTPHONE_AGENT_ID,
       baseUrl: config.AGENTPHONE_BASE_URL
     }),
-  reservationLogWriter: ReservationLogWriter = appendReservationLogEntry
+  reservationLogWriter: ReservationLogWriter = defaultReservationRecorder
 ): PostCallService {
   return async (call) => {
     if (!call.caller || call.caller === "web") {

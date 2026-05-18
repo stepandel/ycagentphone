@@ -58,7 +58,6 @@ const envSchema = z.object({
   RESTAURANT_TIME_ZONE: z.string().default("America/Los_Angeles"),
   RESTAURANT_GREETING: z.string().default("Good evening, and thank you for calling. This is the restaurant's virtual host. How may I help you today?"),
   RESTAURANT_PROCESSING_MESSAGE: z.string().default("Of course. Let me check that for you."),
-  RESERVATION_LOG_PATH: z.string().default("data/reservation-log.md"),
   RESERVATION_DB_PATH: z.string().default("data/reservations.sqlite"),
   PUBLIC_CONTACT_EMAIL: z.string().email().default("sales@example.com"),
   PORT: z.coerce.number().int().positive().default(3000),
