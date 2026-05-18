@@ -61,7 +61,16 @@ export function formatKnowledgeSnippets(snippets: KnowledgeSnippet[]): string {
     .map((snippet, index) => {
       const source = snippet.source ? `\nSource: ${snippet.source}` : "";
       const score = typeof snippet.score === "number" ? `\nSimilarity: ${snippet.score.toFixed(3)}` : "";
-      return `[${index + 1}]${source}${score}\n${snippet.content}`;
+      const content = truncateSnippet(snippet.content, config.MOSS_SNIPPET_MAX_CHARACTERS);
+      return `[${index + 1}]${source}${score}\n${content}`;
     })
     .join("\n\n---\n\n");
+}
+
+function truncateSnippet(content: string, maxCharacters: number): string {
+  const normalized = content.trim();
+  if (normalized.length <= maxCharacters) return normalized;
+
+  const truncated = normalized.slice(0, maxCharacters).trimEnd();
+  return `${truncated}\n[truncated]`;
 }

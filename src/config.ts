@@ -36,6 +36,7 @@ const envSchema = z.object({
   MOSS_INDEX_NAME: z.string().min(1).default("ycagentphone-restaurant-kb"),
   MOSS_SEARCH_LIMIT: z.coerce.number().int().positive().default(8),
   MOSS_SEARCH_ALPHA: z.coerce.number().min(0).max(1).default(0.8),
+  MOSS_SNIPPET_MAX_CHARACTERS: z.coerce.number().int().positive().default(1400),
   MOSS_AUTO_REFRESH: optionalBoolean.default(true),
   MOSS_AUTO_REFRESH_INTERVAL_SECONDS: z.coerce.number().int().positive().default(300),
   MOSS_CACHE_PATH: optionalNonEmptyString,

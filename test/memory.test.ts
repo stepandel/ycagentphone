@@ -17,4 +17,17 @@ describe("formatKnowledgeSnippets", () => {
   it("handles empty retrieval results", () => {
     expect(formatKnowledgeSnippets([])).toBe("No matching knowledgebase entries were found.");
   });
+
+  it("caps long snippets before adding them to the answer prompt", () => {
+    const formatted = formatKnowledgeSnippets([
+      {
+        content: "a".repeat(1500),
+        source: "kb/menu.md",
+        score: 1
+      }
+    ]);
+
+    expect(formatted).toContain("\n[truncated]");
+    expect(formatted.length).toBeLessThan(1500);
+  });
 });
