@@ -24,6 +24,7 @@ import {
   updateReservationDepositStatus,
   type Reservation
 } from "./reservation-store.js";
+import { summarizeReservationNote } from "./reservation-notes.js";
 import { extractReservationUpdatesFromText } from "./reservation-text.js";
 import { initLangfuseTracing, shutdownLangfuseTracing } from "./tracing.js";
 
@@ -150,7 +151,7 @@ async function recordTextFollowUp(req: Request, turn: ReturnType<typeof extractC
     const updates = extractReservationUpdatesFromText(turn.transcript ?? "");
     const summary = formatReservationUpdateSummary(updates);
     if (!summary) return;
-    appendReservationNoteByCaller(turn.caller, `text update: ${summary}`);
+    await appendReservationNoteByCaller(turn.caller, `text update: ${summary}`, { summarizeNotes: summarizeReservationNote });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown reservation note error.";
     console.error(`Reservation text follow-up note failed: ${message}`);

@@ -6,6 +6,7 @@ import {
   type SendAgentPhoneMessageOptions
 } from "./agentphone.js";
 import { callReservationId, recordReservationCall } from "./reservation-store.js";
+import { summarizeReservationNote } from "./reservation-notes.js";
 
 export type ReservationDetails = {
   guestName?: string;
@@ -46,21 +47,24 @@ export function createReservationLogEntry(input: {
 }
 
 async function defaultReservationRecorder(entry: ReservationLogEntry): Promise<void> {
-  recordReservationCall({
-    id: entry.id,
-    callId: entry.callId,
-    caller: entry.caller,
-    conversationContext: entry.conversationContext,
-    reservation: entry.reservation,
-    deposit: entry.deposit
-      ? {
-          amountCents: entry.deposit.amountCents,
-          currency: entry.deposit.currency,
-          paymentLinkUrl: entry.deposit.paymentLinkUrl
-        }
-      : undefined,
-    createdAt: entry.createdAt
-  });
+  await recordReservationCall(
+    {
+      id: entry.id,
+      callId: entry.callId,
+      caller: entry.caller,
+      conversationContext: entry.conversationContext,
+      reservation: entry.reservation,
+      deposit: entry.deposit
+        ? {
+            amountCents: entry.deposit.amountCents,
+            currency: entry.deposit.currency,
+            paymentLinkUrl: entry.deposit.paymentLinkUrl
+          }
+        : undefined,
+      createdAt: entry.createdAt
+    },
+    { summarizeNotes: summarizeReservationNote }
+  );
 }
 
 export type PostCallSummary = {

@@ -956,13 +956,46 @@ export type RecordReservationCallResult =
   | { recorded: true; reservation: Reservation }
   | { recorded: false; reason: "missing-date-or-party" | "duplicate" };
 
-export function recordReservationCall(input: RecordReservationCallInput): RecordReservationCallResult {
+const MAX_NOTES_TOTAL_CHARS = 200;
+
+function truncate(text: string, limit: number): string {
+  if (text.length <= limit) return text;
+  return `${text.slice(0, limit - 1).trimEnd()}…`;
+}
+
+type NoteSummarizer = (text: string) => Promise<string>;
+
+async function condenseNotes(text: string, summarize?: NoteSummarizer): Promise<string> {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (normalized.length <= MAX_NOTES_TOTAL_CHARS) return normalized;
+  if (!summarize) return truncate(normalized, MAX_NOTES_TOTAL_CHARS);
+  try {
+    const summary = (await summarize(normalized)).replace(/\s+/g, " ").trim();
+    if (!summary) return truncate(normalized, MAX_NOTES_TOTAL_CHARS);
+    return summary.length <= MAX_NOTES_TOTAL_CHARS ? summary : truncate(summary, MAX_NOTES_TOTAL_CHARS);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Note summarization error.";
+    console.error(`Note summarization failed; falling back to truncation: ${message}`);
+    return truncate(normalized, MAX_NOTES_TOTAL_CHARS);
+  }
+}
+
+export type RecordReservationCallOptions = {
+  summarizeNotes?: NoteSummarizer;
+};
+
+export async function recordReservationCall(
+  input: RecordReservationCallInput,
+  options: RecordReservationCallOptions = {}
+): Promise<RecordReservationCallResult> {
   const createdAt = input.createdAt ?? new Date().toISOString();
   const partySize = parsePartySizeFromExtraction(input.reservation.partySize);
   const startsAt = parseReservationDateTime(input.reservation.day, input.reservation.time, new Date(createdAt));
   if (!startsAt || !partySize) return { recorded: false, reason: "missing-date-or-party" };
 
   const id = input.id ?? callReservationId(input.callId, input.caller, createdAt);
+  const rawNotes = input.reservation.specialNotes?.trim();
+  const notes = rawNotes ? await condenseNotes(rawNotes, options.summarizeNotes) : undefined;
   const db = openReservationDatabase();
   try {
     seedDiningTables(db);
@@ -976,9 +1009,7 @@ export function recordReservationCall(input: RecordReservationCallInput): Record
       phone: input.caller,
       partySize,
       startsAt,
-      notes: input.reservation.specialNotes?.trim()
-        ? truncate(input.reservation.specialNotes.trim().replace(/\s+/g, " "), MAX_NOTES_TOTAL_CHARS)
-        : undefined,
+      notes,
       depositAmountCents: input.deposit?.amountCents,
       depositCurrency: input.deposit?.currency,
       depositPaymentLinkUrl: input.deposit?.paymentLinkUrl,
@@ -991,28 +1022,26 @@ export function recordReservationCall(input: RecordReservationCallInput): Record
   }
 }
 
-const MAX_NOTE_CHARS = 80;
-const MAX_NOTES_TOTAL_CHARS = 200;
-
-function truncate(text: string, limit: number): string {
-  if (text.length <= limit) return text;
-  return `${text.slice(0, limit - 1).trimEnd()}…`;
-}
-
-export function appendReservationNoteByCaller(caller: string | undefined, note: string): Reservation | undefined {
+export async function appendReservationNoteByCaller(
+  caller: string | undefined,
+  note: string,
+  options: { summarizeNotes?: NoteSummarizer } = {}
+): Promise<Reservation | undefined> {
   if (!caller || !note.trim()) return undefined;
-  const db = openReservationDatabase();
-  try {
-    const latest = findLatestReservationByPhone(db, caller);
-    if (!latest) return undefined;
-    const trimmed = truncate(note.trim().replace(/\s+/g, " "), MAX_NOTE_CHARS);
-    const merged = latest.notes ? `${latest.notes}; ${trimmed}` : trimmed;
-    const combined = truncate(merged, MAX_NOTES_TOTAL_CHARS);
-    db.prepare("UPDATE reservations SET notes = ?, updated_at = ? WHERE id = ?").run(combined, new Date().toISOString(), latest.id);
-    return getReservation(db, latest.id);
-  } finally {
-    db.close();
-  }
+  const merged = await (async () => {
+    const db = openReservationDatabase();
+    try {
+      const latest = findLatestReservationByPhone(db, caller);
+      if (!latest) return undefined;
+      const candidate = latest.notes ? `${latest.notes}; ${note.trim()}` : note.trim();
+      const condensed = await condenseNotes(candidate, options.summarizeNotes);
+      db.prepare("UPDATE reservations SET notes = ?, updated_at = ? WHERE id = ?").run(condensed, new Date().toISOString(), latest.id);
+      return getReservation(db, latest.id);
+    } finally {
+      db.close();
+    }
+  })();
+  return merged;
 }
 
 export function formatReservationContextForCaller(caller: string | undefined): string {
