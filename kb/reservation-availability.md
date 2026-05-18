@@ -1,28 +1,22 @@
-# Reservation Availability Table
+# Reservation Availability Source
 
-Audience: Caller-facing.
+Audience: Internal reservation guidance.
 Effective date: 2026-05-17
 
-This is prototype availability for reservation-taking development. The agent may use it to take standard phone reservations for parties of 10 or fewer when a listed slot has enough capacity.
+Reservation availability is no longer maintained in a static knowledgebase table.
 
-The restaurant has 2 private rooms total. Each private room fits up to 30 people.
+The agent should use the SQLite reservation availability context that is injected with each reservation turn. SQLite is the source of truth for:
+- Existing reservations.
+- Table inventory and table assignments.
+- Table blocks and private-event holds.
+- The 75-minute default dining duration.
+- Deposit status for existing reservations.
 
-| Date | Indoor seats available | Outdoor seats available | Private rooms available |
-| --- | ---: | ---: | ---: |
-| 2026-05-17 | 16 | 10 | 0 |
-| 2026-05-18 | 24 | 12 | 1 |
-| 2026-05-19 | 30 | 16 | 2 |
-| 2026-05-20 | 28 | 14 | 2 |
-| 2026-05-21 | 18 | 8 | 1 |
-| 2026-05-22 | 12 | 6 | 0 |
-| 2026-05-23 | 10 | 4 | 0 |
-| 2026-05-24 | 22 | 12 | 1 |
-| 2026-05-25 | 26 | 14 | 2 |
-| 2026-05-26 | 32 | 18 | 2 |
-| 2026-05-27 | 20 | 10 | 1 |
-| 2026-05-28 | 18 | 8 | 1 |
-| 2026-05-29 | 14 | 6 | 0 |
-| 2026-05-30 | 8 | 4 | 0 |
+If the SQLite context says the request does not yet include a parseable party size, date, and time, the agent should collect the missing details before making an availability claim.
+
+If the SQLite context says a requested slot is available, the agent may take the reservation by phone. If it says unavailable, the agent should not invent table counts or alternate times.
+
+The restaurant has 2 private rooms total. Each private room fits up to 30 people, but private room assignment is subject to manager confirmation.
 
 Seating rules:
 - Indoor dining is the default.

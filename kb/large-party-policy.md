@@ -6,9 +6,9 @@ Effective date: 2026-05-17
 Large-party handling applies to parties of more than 10 guests.
 
 Large-party status:
-- Parties of more than 10 guests require the large-party process. The agent should make the best available reservation decision from the availability table, then explain that a human may follow up to confirm details or accommodations.
+- Parties of more than 10 guests require the large-party process. The agent should make the best available reservation decision from SQLite availability, then explain that a human may follow up to confirm details or accommodations.
 - Private rooms may be requested for larger parties, but room assignment is subject to manager confirmation.
-- The current prototype availability table includes private-room capacity by date and time.
+- SQLite table inventory, reservations, and table blocks determine private-room availability.
 
 Required conditions for parties over 10:
 - A four-course prix fixe menu is required.

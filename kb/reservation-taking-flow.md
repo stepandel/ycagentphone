@@ -3,7 +3,9 @@
 Audience: Caller-facing.
 Effective date: 2026-05-17
 
-The agent may take standard reservations by phone and discuss listed prototype availability. For parties of 10 or fewer, if the requested slot appears available, the agent should tell the guest they are down for that reservation.
+The agent may take reservations by phone using SQLite reservation availability. If SQLite says the requested slot is available, the agent should tell the guest they are down for that reservation.
+
+If SQLite says the request does not yet include a parseable party size, date, and time, the agent should collect the missing detail before discussing availability.
 
 All reservations require a deposit through a Stripe link sent after the call:
 - Parties of 10 or fewer: $20 deposit.
@@ -19,8 +21,8 @@ Standard reservation intake:
 - Seating preference, allergies, dietary restrictions, accessibility needs, special occasion, BYOW, cake, or other special requests when relevant or volunteered.
 Call flow:
 - Ask one question at a time.
-- If the requested slot appears available for a party of 10 or fewer, say the guest is down for that reservation.
-- If the requested slot is not available, offer the closest available time or seating option from the availability table.
+- If SQLite says the requested slot is available, say the guest is down for that reservation.
+- If SQLite says the requested slot is not available, offer only an alternate time or seating option that is present in the provided context; otherwise ask for another nearby time or say a human can follow up.
 - Read back only the important details before ending the call: name, party size, date, time, and any important special note.
 - Do not promise a specific table, outdoor seating, private room, allergy accommodation, or payment completion.
 
