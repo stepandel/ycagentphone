@@ -77,6 +77,14 @@ export type AvailabilityResult = {
   suggestedTableIds: number[];
   suggestedCapacity: number;
   isAvailable: boolean;
+  nearbyAvailableTimes: AvailabilityTimeSuggestion[];
+};
+
+export type AvailabilityTimeSuggestion = {
+  startsAt: string;
+  endsAt: string;
+  suggestedTableIds: number[];
+  suggestedCapacity: number;
 };
 
 type DiningTableRow = {
@@ -120,6 +128,12 @@ type ReservationLogRow = {
   deposit_status: ReservationDepositStatus;
   tables: string | null;
   notes: string | null;
+};
+
+type ServiceHoursRow = {
+  opens_at: string;
+  closes_at: string;
+  is_closed: number;
 };
 
 export type ParsedReservationRequest = {
@@ -386,6 +400,29 @@ function parsePositiveInteger(value: number, label: string): number {
   return value;
 }
 
+function timeToMinutes(value: string): number {
+  const [hour, minute] = value.split(":").map(Number);
+  return hour * 60 + minute;
+}
+
+function localMinutesSinceMidnight(iso: string): number {
+  return timeToMinutes(localTime(iso));
+}
+
+function isWithinServiceHours(db: Database, startsAt: string, endsAt: string): boolean {
+  const parts = localDateParts(new Date(startsAt));
+  const hours = db
+    .query<ServiceHoursRow, [number]>("SELECT opens_at, closes_at, is_closed FROM service_hours WHERE day_of_week = ?")
+    .get(parts.weekday);
+
+  if (!hours) return true;
+  if (hours.is_closed === 1) return false;
+  if (localDate(startsAt) !== localDate(endsAt)) return false;
+
+  const startMinutes = localMinutesSinceMidnight(startsAt);
+  return startMinutes >= timeToMinutes(hours.opens_at) && startMinutes <= timeToMinutes(hours.closes_at);
+}
+
 function optionalPositiveInteger(value: number | undefined, label: string): number | undefined {
   return value === undefined ? undefined : parsePositiveInteger(value, label);
 }
@@ -543,6 +580,37 @@ export function findAvailableTables(db: Database, request: AvailabilityRequest):
   const durationMinutes = parsePositiveInteger(request.durationMinutes ?? DEFAULT_RESERVATION_DURATION_MINUTES, "Duration");
   const requestedStart = isoDateTime(request.startsAt);
   const requestedEnd = addMinutes(requestedStart, durationMinutes);
+  const availability = findAvailableTablesForRange(db, partySize, requestedStart, requestedEnd);
+
+  return {
+    ...availability,
+    requestedStart,
+    requestedEnd,
+    partySize,
+    nearbyAvailableTimes: availability.isAvailable
+      ? []
+      : findNearbyAvailableTimes(db, {
+          partySize,
+          startsAt: requestedStart,
+          durationMinutes
+        })
+  };
+}
+
+function findAvailableTablesForRange(
+  db: Database,
+  partySize: number,
+  requestedStart: string,
+  requestedEnd: string
+): Pick<AvailabilityResult, "availableTables" | "suggestedTableIds" | "suggestedCapacity" | "isAvailable"> {
+  if (!isWithinServiceHours(db, requestedStart, requestedEnd)) {
+    return {
+      availableTables: [],
+      suggestedTableIds: [],
+      suggestedCapacity: 0,
+      isAvailable: false
+    };
+  }
 
   const availableTables = db
     .query<DiningTableRow, [string, string, string, string]>(
@@ -576,14 +644,44 @@ export function findAvailableTables(db: Database, request: AvailabilityRequest):
   const suggestedCapacity = suggestion.reduce((sum, table) => sum + table.capacity, 0);
 
   return {
-    requestedStart,
-    requestedEnd,
-    partySize,
     availableTables,
     suggestedTableIds: suggestion.map((table) => table.id),
     suggestedCapacity,
     isAvailable: suggestedCapacity >= partySize
   };
+}
+
+export function findNearbyAvailableTimes(
+  db: Database,
+  request: AvailabilityRequest & { searchWindowMinutes?: number; intervalMinutes?: number; limit?: number }
+): AvailabilityTimeSuggestion[] {
+  const partySize = parsePositiveInteger(request.partySize, "Party size");
+  const durationMinutes = parsePositiveInteger(request.durationMinutes ?? DEFAULT_RESERVATION_DURATION_MINUTES, "Duration");
+  const searchWindowMinutes = parsePositiveInteger(request.searchWindowMinutes ?? 120, "Search window");
+  const intervalMinutes = parsePositiveInteger(request.intervalMinutes ?? 15, "Search interval");
+  const limit = parsePositiveInteger(request.limit ?? 4, "Suggestion limit");
+  const requestedStart = isoDateTime(request.startsAt);
+  const requestedDate = localDate(requestedStart);
+  const suggestions: AvailabilityTimeSuggestion[] = [];
+
+  for (let offset = intervalMinutes; offset <= searchWindowMinutes && suggestions.length < limit; offset += intervalMinutes) {
+    for (const direction of [-1, 1]) {
+      const startsAt = addMinutes(requestedStart, offset * direction);
+      if (localDate(startsAt) !== requestedDate || startsAt === requestedStart) continue;
+      const endsAt = addMinutes(startsAt, durationMinutes);
+      const availability = findAvailableTablesForRange(db, partySize, startsAt, endsAt);
+      if (!availability.isAvailable) continue;
+      suggestions.push({
+        startsAt,
+        endsAt,
+        suggestedTableIds: availability.suggestedTableIds,
+        suggestedCapacity: availability.suggestedCapacity
+      });
+      if (suggestions.length >= limit) break;
+    }
+  }
+
+  return suggestions.sort((left, right) => left.startsAt.localeCompare(right.startsAt));
 }
 
 function chooseTableCombination(tables: DiningTable[], partySize: number): DiningTable[] {
@@ -936,6 +1034,11 @@ export function formatAvailabilityContext(db: Database, request: AvailabilityReq
         .map((table) => `${table.name} (${table.capacity})`)
         .join(", ")
     : "none";
+  const nearbyTimes = availability.nearbyAvailableTimes.length
+    ? availability.nearbyAvailableTimes
+        .map((time) => `${localTime(time.startsAt)}-${localTime(time.endsAt)} (capacity ${time.suggestedCapacity})`)
+        .join(", ")
+    : "none found within 2 hours";
 
   return [
     `SQLite reservation availability for ${date} ${startTime}-${endTime}:`,
@@ -943,6 +1046,7 @@ export function formatAvailabilityContext(db: Database, request: AvailabilityReq
     `Default dining time: ${request.durationMinutes ?? DEFAULT_RESERVATION_DURATION_MINUTES} minutes`,
     `Available: ${availability.isAvailable ? "yes" : "no"}`,
     `Suggested table assignment: ${suggestedTables}`,
+    `Nearby available times: ${nearbyTimes}`,
     formatReservationDayLog(db, date)
   ].join("\n");
 }

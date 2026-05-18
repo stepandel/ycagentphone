@@ -17,6 +17,7 @@ import {
 function testDatabase(): Database {
   const db = new Database(":memory:");
   initializeReservationSchema(db);
+  db.prepare("INSERT INTO service_hours (day_of_week, opens_at, closes_at, is_closed) VALUES (?, ?, ?, ?)").run(5, "17:00", "22:00", 0);
   seedDiningTables(db, [
     { name: "Two Top", capacity: 2, area: "dining room" },
     { name: "Four Top", capacity: 4, area: "dining room" },
@@ -107,8 +108,44 @@ describe("reservation store", () => {
     });
     expect(context).toContain("Default dining time: 75 minutes");
     expect(context).toContain("Available: yes");
+    expect(context).toContain("Nearby available times: none found within 2 hours");
     expect(context).toContain("Taylor; party of 4");
     expect(context).toContain("deposit: not required");
+  });
+
+  it("shows nearby alternatives when a requested slot is capacity blocked", () => {
+    const db = testDatabase();
+    db.prepare("INSERT INTO service_hours (day_of_week, opens_at, closes_at, is_closed) VALUES (?, ?, ?, ?)").run(4, "17:30", "22:00", 0);
+    blockTable(db, {
+      startsAt: "2026-05-21T17:45:00-07:00",
+      endsAt: "2026-05-21T19:15:00-07:00",
+      reason: "manager capacity hold"
+    });
+
+    const context = formatAvailabilityContext(db, {
+      partySize: 8,
+      startsAt: "2026-05-21T18:00:00-07:00"
+    });
+
+    expect(context).toContain("SQLite reservation availability for 2026-05-21 18:00-19:15");
+    expect(context).toContain("Available: no");
+    expect(context).toContain("Suggested table assignment: none");
+    expect(context).toContain("Nearby available times:");
+    expect(context).toContain("19:15-20:30");
+    expect(context).not.toContain("16:15-17:30");
+  });
+
+  it("does not show slots outside service hours as available", () => {
+    const db = testDatabase();
+    db.prepare("INSERT INTO service_hours (day_of_week, opens_at, closes_at, is_closed) VALUES (?, ?, ?, ?)").run(4, "17:30", "22:00", 0);
+
+    const availability = findAvailableTables(db, {
+      partySize: 2,
+      startsAt: "2026-05-21T16:15:00-07:00"
+    });
+
+    expect(availability.isAvailable).toBe(false);
+    expect(availability.availableTables).toHaveLength(0);
   });
 
   it("tracks Stripe deposit status and references", () => {
