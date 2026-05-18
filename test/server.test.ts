@@ -107,6 +107,28 @@ describe("server", () => {
     ]);
   });
 
+  it("streams an interim response when reservation details are in recent history", async () => {
+    const app = createApp(async () => "Yes, we have room at 7.");
+
+    const response = await postSigned(app, "/webhooks/agentphone", {
+      channel: "voice",
+      event: "agent.message",
+      transcript: "Yes, that works.",
+      recentHistory: [
+        { role: "caller", content: "Can I book a table for 4 next Friday?" },
+        { role: "agent", content: "What time would you like?" },
+        { role: "caller", content: "7pm." }
+      ]
+    }).expect(200);
+
+    const lines = response.text.trim().split("\n").map((line) => JSON.parse(line));
+    expect(response.headers["content-type"]).toContain("application/x-ndjson");
+    expect(lines).toEqual([
+      { text: "Of course. Let me check that for you.", interim: true },
+      { text: "Yes, we have room at 7." }
+    ]);
+  });
+
   it("passes hangup controls through normal webhook responses", async () => {
     const app = createApp(async () => ({ text: "Thanks for calling. Goodbye.", hangup: true }));
 

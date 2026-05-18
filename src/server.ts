@@ -21,6 +21,7 @@ import {
   seedDiningTables
 } from "./reservation-store.js";
 import { extractReservationUpdatesFromText } from "./reservation-text.js";
+import { isReservationQuery } from "./skills/reservation-taking.js";
 import { initLangfuseTracing, shutdownLangfuseTracing } from "./tracing.js";
 
 type RawBodyRequest = Request & {
@@ -52,10 +53,48 @@ function answerChunk(answer: AnswerResult) {
       };
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
+}
+
+function textFromTranscriptMessages(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const text = value
+    .map((message) => {
+      const item = asRecord(message);
+      const content = item.content ?? item.text ?? item.transcript ?? item.message ?? item.body;
+      return typeof content === "string" ? content.trim() : "";
+    })
+    .filter(Boolean)
+    .join("\n");
+  return text || undefined;
+}
+
+function reservationCheckTextCandidates(turn: ReturnType<typeof extractCallTurn>): string[] {
+  const raw = asRecord(turn.raw);
+  const data = asRecord(raw.data);
+  const call = asRecord(raw.call);
+  const conversation = asRecord(raw.conversation);
+  return [
+    turn.transcript,
+    textFromTranscriptMessages(raw.recentHistory),
+    textFromTranscriptMessages(raw.messages),
+    textFromTranscriptMessages(data.messages),
+    textFromTranscriptMessages(conversation.messages),
+    typeof raw.transcript === "string" ? raw.transcript : undefined,
+    typeof data.transcript === "string" ? data.transcript : undefined,
+    typeof call.transcript === "string" ? call.transcript : undefined,
+    typeof conversation.transcript === "string" ? conversation.transcript : undefined
+  ].filter((text): text is string => Boolean(text?.trim()));
+}
+
 function needsReservationAvailabilityCheck(turn: ReturnType<typeof extractCallTurn>): boolean {
   if (turn.isCallStart) return false;
-  const parsed = parseReservationRequestText(turn.transcript);
-  return Boolean(parsed.partySize && parsed.startsAt);
+  return reservationCheckTextCandidates(turn).some((text) => {
+    if (!isReservationQuery(text)) return false;
+    const parsed = parseReservationRequestText(text);
+    return Boolean(parsed.partySize && parsed.startsAt);
+  });
 }
 
 function isTextFollowUp(req: Request, turn: ReturnType<typeof extractCallTurn>): boolean {
