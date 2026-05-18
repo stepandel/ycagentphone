@@ -16,6 +16,7 @@ import {
   listDiningTables,
   listReservations,
   openReservationDatabase,
+  parseReservationRequestText,
   seedDiningTables
 } from "./reservation-store.js";
 import { extractReservationUpdatesFromText } from "./reservation-text.js";
@@ -48,6 +49,12 @@ function answerChunk(answer: AnswerResult) {
         text: answer.text,
         ...(answer.hangup ? { hangup: true, action: "hangup" } : {})
       };
+}
+
+function needsReservationAvailabilityCheck(turn: ReturnType<typeof extractCallTurn>): boolean {
+  if (turn.isCallStart) return false;
+  const parsed = parseReservationRequestText(turn.transcript);
+  return Boolean(parsed.partySize && parsed.startsAt);
 }
 
 function isTextFollowUp(req: Request, turn: ReturnType<typeof extractCallTurn>): boolean {
@@ -188,7 +195,9 @@ export function createApp(
 
     if (shouldStream) {
       res.setHeader("Content-Type", "application/x-ndjson");
-      res.write(`${JSON.stringify({ text: config.RESTAURANT_PROCESSING_MESSAGE, interim: true })}\n`);
+      if (needsReservationAvailabilityCheck(turn)) {
+        res.write(`${JSON.stringify({ text: config.RESTAURANT_PROCESSING_MESSAGE, interim: true })}\n`);
+      }
       try {
         const answer = await answerService(turn);
         await recordTextFollowUp(req, turn);
@@ -215,7 +224,11 @@ export function createApp(
 
     if (req.query.stream === "1" || req.headers.accept?.includes("application/x-ndjson")) {
       res.setHeader("Content-Type", "application/x-ndjson");
-      res.send(formatAgentPhoneStreamingResponse(config.RESTAURANT_PROCESSING_MESSAGE, answer));
+      res.send(
+        needsReservationAvailabilityCheck(turn)
+          ? formatAgentPhoneStreamingResponse(config.RESTAURANT_PROCESSING_MESSAGE, answer)
+          : `${JSON.stringify(answerChunk(answer))}\n`
+      );
       return;
     }
 

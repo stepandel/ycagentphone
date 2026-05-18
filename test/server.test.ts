@@ -88,8 +88,23 @@ describe("server", () => {
     const response = await postSigned(app, "/webhooks/agentphone?stream=1", { transcript: "Hello" }).expect(200);
 
     expect(response.headers["content-type"]).toContain("application/x-ndjson");
-    expect(response.text).toContain('"interim":true');
+    expect(response.text).not.toContain('"interim":true');
     expect(response.text).toContain('"text":"The answer."');
+  });
+
+  it("streams an interim response for reservation availability checks", async () => {
+    const app = createApp(async () => "Yes, we have room at 7.");
+
+    const response = await postSigned(app, "/webhooks/agentphone?stream=1", {
+      transcript: "Can I book a table for 4 next Friday at 7pm?"
+    }).expect(200);
+
+    const lines = response.text.trim().split("\n").map((line) => JSON.parse(line));
+    expect(response.headers["content-type"]).toContain("application/x-ndjson");
+    expect(lines).toEqual([
+      { text: "Of course. Let me check that for you.", interim: true },
+      { text: "Yes, we have room at 7." }
+    ]);
   });
 
   it("passes hangup controls through normal webhook responses", async () => {
@@ -104,7 +119,7 @@ describe("server", () => {
     });
   });
 
-  it("streams an interim response before slow voice answers", async () => {
+  it("streams non-reservation voice answers without an interim response", async () => {
     let answerStarted = false;
     const app = createApp(
       () =>
@@ -123,10 +138,7 @@ describe("server", () => {
     const lines = response.text.trim().split("\n").map((line) => JSON.parse(line));
     expect(answerStarted).toBe(true);
     expect(response.headers["content-type"]).toContain("application/x-ndjson");
-    expect(lines).toEqual([
-      { text: "Of course. Let me check that for you.", interim: true },
-      { text: "The answer." }
-    ]);
+    expect(lines).toEqual([{ text: "The answer." }]);
   });
 
   it("passes hangup controls through voice streaming responses", async () => {
@@ -139,11 +151,11 @@ describe("server", () => {
     }).expect(200);
 
     const lines = response.text.trim().split("\n").map((line) => JSON.parse(line));
-    expect(lines[1]).toEqual({
+    expect(lines).toEqual([{
       text: "Thanks for calling. Goodbye.",
       hangup: true,
       action: "hangup"
-    });
+    }]);
   });
 
   it("handles post-call webhooks and sends reservation follow-up details", async () => {
