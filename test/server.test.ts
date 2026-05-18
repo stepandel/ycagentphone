@@ -92,11 +92,8 @@ describe("server", () => {
     expect(response.text).toContain('"text":"The answer."');
   });
 
-  it("streams an interim response when the reservation availability tool is called", async () => {
-    const app = createApp(async ({ onToolCall }) => {
-      onToolCall?.({ name: "check_reservation_availability", arguments: JSON.stringify({ partySize: 4, date: "2026-05-22", time: "19:00" }) });
-      return "Yes, we have room at 7.";
-    });
+  it("streams an interim response for reservation availability checks", async () => {
+    const app = createApp(async () => "Yes, we have room at 7.");
 
     const response = await postSigned(app, "/webhooks/agentphone?stream=1", {
       transcript: "Can I book a table for 4 next Friday at 7pm?"
@@ -135,7 +132,7 @@ describe("server", () => {
     expect(answeredTranscript).toContain("caller: Yes, that works.");
   });
 
-  it("does not infer an interim response from AgentPhone voice history alone", async () => {
+  it("streams an interim response for latest AgentPhone voice history even when channel is omitted", async () => {
     const app = createApp(async () => "Yes, we have room at 7.");
 
     const response = await postSigned(app, "/webhooks/agentphone", {
@@ -148,7 +145,10 @@ describe("server", () => {
 
     const lines = response.text.trim().split("\n").map((line) => JSON.parse(line));
     expect(response.headers["content-type"]).toContain("application/x-ndjson");
-    expect(lines).toEqual([{ text: "Yes, we have room at 7." }]);
+    expect(lines).toEqual([
+      { text: "Of course. Let me check that for you.", interim: true },
+      { text: "Yes, we have room at 7." }
+    ]);
   });
 
   it("passes hangup controls through normal webhook responses", async () => {

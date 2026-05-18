@@ -7,6 +7,7 @@ import {
   extractCallTurn,
   extractPostCallWebhook,
   formatAgentPhoneResponse,
+  formatAgentPhoneStreamingResponse,
   sendAgentPhoneMessage,
   verifyAgentPhoneSignature
 } from "./agentphone.js";
@@ -20,19 +21,19 @@ import {
   listDiningTables,
   listReservations,
   openReservationDatabase,
+  parseReservationRequestText,
   seedDiningTables,
   updateReservationDepositStatus,
   type Reservation
 } from "./reservation-store.js";
 import { summarizeReservationNote } from "./reservation-notes.js";
 import { extractReservationUpdatesFromText } from "./reservation-text.js";
+import { isReservationQuery } from "./skills/reservation-taking.js";
 import { initLangfuseTracing, shutdownLangfuseTracing } from "./tracing.js";
 
 type RawBodyRequest = Request & {
   rawBody?: Buffer;
 };
-
-const CHECK_RESERVATION_AVAILABILITY_TOOL_NAME = "check_reservation_availability";
 
 type TextReplySender = (options: { toNumber: string; body: string; numberId?: string }) => Promise<unknown>;
 
@@ -137,6 +138,70 @@ function formatStripePaymentConfirmation(reservation: Reservation): string {
         }).format(reservation.depositAmountCents / 100)}`
       : "";
   return `Thanks, your${amount} reservation deposit is paid. Your reservation at ${config.COMPANY_NAME} is confirmed.`;
+}
+
+function latestCallerTextFromMessages(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return undefined;
+  for (let index = value.length - 1; index >= 0; index -= 1) {
+    const item = asRecord(value[index]);
+    const role = String(item.role ?? item.speaker ?? item.from ?? item.direction ?? "").toLowerCase();
+    if (role === "agent" || role === "assistant" || role === "outbound") continue;
+    const content = item.content ?? item.text ?? item.transcript ?? item.message ?? item.body;
+    if (typeof content === "string" && content.trim()) return content.trim();
+  }
+  return undefined;
+}
+
+function firstText(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function latestReservationCheckText(turn: ReturnType<typeof extractCallTurn>): string | undefined {
+  const raw = asRecord(turn.raw);
+  const data = asRecord(raw.data);
+  const call = asRecord(raw.call);
+  const conversation = asRecord(raw.conversation);
+  const message = asRecord(raw.message);
+  const sms = asRecord(raw.sms);
+  const latestExplicitText = firstText(
+    raw.transcript,
+    raw.text,
+    raw.message,
+    raw.input,
+    raw.userInput,
+    raw.callerTranscript,
+    data.transcript,
+    data.text,
+    data.message,
+    data.body,
+    message.text,
+    message.body,
+    sms.text,
+    sms.body,
+    call.transcript,
+    conversation.transcript
+  );
+  if (latestExplicitText) return latestExplicitText;
+
+  return (
+    latestCallerTextFromMessages(data.messages) ??
+    latestCallerTextFromMessages(raw.messages) ??
+    latestCallerTextFromMessages(conversation.messages) ??
+    latestCallerTextFromMessages(raw.recentHistory) ??
+    latestCallerTextFromMessages(data.recentHistory) ??
+    turn.transcript
+  );
+}
+
+function needsReservationAvailabilityCheck(turn: ReturnType<typeof extractCallTurn>): boolean {
+  if (turn.isCallStart) return false;
+  const text = latestReservationCheckText(turn);
+  if (!isReservationQuery(text)) return false;
+  const parsed = parseReservationRequestText(text);
+  return Boolean(parsed.partySize && parsed.startsAt);
 }
 
 function isTextFollowUp(req: Request, turn: ReturnType<typeof extractCallTurn>): boolean {
@@ -373,14 +438,11 @@ export function createApp(
 
     if (shouldStream) {
       res.setHeader("Content-Type", "application/x-ndjson");
-      let wroteProcessingMessage = false;
-      const writeProcessingMessage = (toolCall: { name: string }) => {
-        if (toolCall.name !== CHECK_RESERVATION_AVAILABILITY_TOOL_NAME || wroteProcessingMessage) return;
-        wroteProcessingMessage = true;
+      if (needsReservationAvailabilityCheck(turn)) {
         res.write(`${JSON.stringify({ text: config.RESTAURANT_PROCESSING_MESSAGE, interim: true })}\n`);
-      };
+      }
       try {
-        const answer = await answerService({ ...turn, onToolCall: writeProcessingMessage });
+        const answer = await answerService(turn);
         await recordTextFollowUp(req, turn);
         res.write(`${JSON.stringify(answerChunk(answer))}\n`);
       } catch (error) {
@@ -405,7 +467,11 @@ export function createApp(
 
     if (req.query.stream === "1" || req.headers.accept?.includes("application/x-ndjson")) {
       res.setHeader("Content-Type", "application/x-ndjson");
-      res.send(`${JSON.stringify(answerChunk(answer))}\n`);
+      res.send(
+        needsReservationAvailabilityCheck(turn)
+          ? formatAgentPhoneStreamingResponse(config.RESTAURANT_PROCESSING_MESSAGE, answer)
+          : `${JSON.stringify(answerChunk(answer))}\n`
+      );
       return;
     }
 

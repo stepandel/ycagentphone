@@ -70,7 +70,6 @@ export type AnswerOptions = {
   callId?: string;
   caller?: string;
   channel?: "voice" | "text";
-  onToolCall?: (toolCall: { name: string; arguments: string }) => void | Promise<void>;
 };
 
 export type AnswerResult = string | VoiceAnswer;
@@ -253,7 +252,7 @@ function promptCacheKey(channel: "voice" | "text"): string {
   return `agentphone-${company}-${channel}`;
 }
 
-export const answerCaller: AnswerService = async ({ transcript, isCallStart, callId, caller, channel = "voice", onToolCall }) => withAnswerTrace({ transcript, isCallStart, callId, caller }, async () => {
+export const answerCaller: AnswerService = async ({ transcript, isCallStart, callId, caller, channel = "voice" }) => withAnswerTrace({ transcript, isCallStart, callId, caller }, async () => {
   if (isCallStart || !transcript?.trim()) {
     return config.RESTAURANT_GREETING;
   }
@@ -299,8 +298,6 @@ export const answerCaller: AnswerService = async ({ transcript, isCallStart, cal
   for (let iteration = 0; iteration < 3; iteration += 1) {
     const calls = functionToolCalls(response, CHECK_RESERVATION_AVAILABILITY_TOOL_NAME);
     if (calls.length === 0) break;
-
-    await Promise.all(calls.map((call) => onToolCall?.({ name: call.name, arguments: call.arguments })));
 
     const toolOutputs: ResponseInputItem[] = calls.map((call) => ({
       type: "function_call_output",
