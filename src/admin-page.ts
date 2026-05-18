@@ -138,6 +138,25 @@ export function renderAdminPage(options: { restaurantName: string; timeZone: str
     color: var(--ink-faint);
     font-size: 12px;
   }
+  .toolbar .legend {
+    display: flex;
+    gap: 10px;
+    color: var(--ink-faint);
+    font-size: 11px;
+    align-items: center;
+  }
+  .toolbar .legend .swatch {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .toolbar .legend .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--swatch) 35%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--swatch) 55%, var(--border));
+  }
   main { padding: 24px 32px 64px; }
   .day {
     margin-bottom: 32px;
@@ -161,7 +180,7 @@ export function renderAdminPage(options: { restaurantName: string; timeZone: str
   }
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 12px;
   }
   .card {
@@ -170,13 +189,67 @@ export function renderAdminPage(options: { restaurantName: string; timeZone: str
     border-radius: 10px;
     padding: 14px 16px;
     display: flex;
-    flex-direction: column;
-    gap: 8px;
+    flex-direction: row;
+    gap: 14px;
     position: relative;
+    align-items: stretch;
+    --tier: var(--ink-faint);
   }
+  .card.party-2 { --tier: var(--info); }
+  .card.party-4 { --tier: var(--good); }
+  .card.party-6 { --tier: var(--warn); }
+  .card.party-10 { --tier: var(--bad); }
   .card.is-recent {
     border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+  .card.is-unconfirmed {
+    opacity: 0.62;
+    border-style: dashed;
+    background: color-mix(in srgb, var(--surface-muted) 60%, var(--surface));
+    transition: opacity 0.15s ease;
+  }
+  .card.is-unconfirmed:hover,
+  .card.is-unconfirmed:focus-within {
+    opacity: 1;
+  }
+  .card.is-unconfirmed .party-block {
+    filter: saturate(0.55);
+  }
+  .card .party-block {
+    flex: 0 0 auto;
+    width: 68px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 6px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--tier) 14%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--tier) 38%, var(--border));
+    color: var(--tier);
+  }
+  .card .party-block .number {
+    font-size: 34px;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+  .card .party-block .label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: 6px;
+    color: color-mix(in srgb, var(--tier) 70%, var(--ink-faint));
+  }
+  .card .body {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
   }
   .card .created {
     font-size: 11px;
@@ -302,6 +375,12 @@ export function renderAdminPage(options: { restaurantName: string; timeZone: str
   <div class="search">
     <input type="search" id="search" placeholder="Search guest, phone, or notes" autocomplete="off" />
   </div>
+  <div class="legend" aria-label="Party-size color legend">
+    <span class="swatch" style="--swatch: var(--info);"><span class="dot"></span>1–2</span>
+    <span class="swatch" style="--swatch: var(--good);"><span class="dot"></span>3–4</span>
+    <span class="swatch" style="--swatch: var(--warn);"><span class="dot"></span>5–9</span>
+    <span class="swatch" style="--swatch: var(--bad);"><span class="dot"></span>10+</span>
+  </div>
   <div class="stats" id="stats"></div>
 </div>
 <main id="content">
@@ -415,38 +494,64 @@ export function renderAdminPage(options: { restaurantName: string; timeZone: str
     return hours + "h ago";
   }
 
+  function partyTier(size) {
+    if (size >= 10) return "10";
+    if (size >= 5) return "6";
+    if (size >= 3) return "4";
+    return "2";
+  }
+
+  const CONFIRMED_DEPOSIT_STATUSES = new Set(["paid", "waived", "not_required"]);
+  function isConfirmed(reservation) {
+    return CONFIRMED_DEPOSIT_STATUSES.has(reservation.depositStatus);
+  }
+
   function renderCard(reservation, options) {
     const opts = options ?? {};
     const tables = reservation.tableIds.map(tableLabel).join(", ");
     const depositLine = formatDeposit(reservation);
-    const phone = reservation.phone ? '<span><span class="label">Phone</span> ' + esc(reservation.phone) + '</span>' : "";
-    const notes = reservation.notes ? '<div class="notes">' + esc(reservation.notes) + '</div>' : "";
+    const phoneLine = reservation.phone
+      ? '    <div class="row"><span><span class="label">Phone</span> ' + esc(reservation.phone) + '</span></div>'
+      : '';
+    const notes = reservation.notes ? '    <div class="notes">' + esc(reservation.notes) + '</div>' : "";
     const showCreated = opts.showCreated && reservation.createdAt;
     const createdLine = showCreated
-      ? '  <div class="created">created ' + esc(formatRelative(reservation.createdAt, opts.nowMs ?? Date.now())) + '</div>'
+      ? '    <div class="created">created ' + esc(formatRelative(reservation.createdAt, opts.nowMs ?? Date.now())) + '</div>'
       : '';
-    const cardClass = opts.highlightRecent ? 'card is-recent' : 'card';
     const dayLine = opts.showDate
-      ? '  <div class="row"><span><span class="label">Date</span> ' + esc(formatDate(reservation.startsAt)) + '</span></div>'
+      ? '    <div class="row"><span><span class="label">Date</span> ' + esc(formatDate(reservation.startsAt)) + '</span></div>'
       : '';
+    const tier = partyTier(reservation.partySize);
+    const cardClass = [
+      'card',
+      'party-' + tier,
+      opts.highlightRecent ? 'is-recent' : '',
+      isConfirmed(reservation) ? '' : 'is-unconfirmed'
+    ].filter(Boolean).join(' ');
+    const guestLabel = reservation.partySize === 1 ? 'guest' : 'guests';
     return [
       '<div class="' + cardClass + '">',
+      '  <div class="party-block" title="Party of ' + reservation.partySize + '">',
+      '    <div class="number">' + reservation.partySize + '</div>',
+      '    <div class="label">' + guestLabel + '</div>',
+      '  </div>',
+      '  <div class="body">',
       createdLine,
-      '  <div class="time">' + esc(formatTime(reservation.startsAt)) + ' – ' + esc(formatTime(reservation.endsAt)),
-      '    <span class="duration">' + esc(formatDuration(reservation.durationMinutes)) + '</span>',
-      '  </div>',
-      '  <div class="guest">' + esc(reservation.guestName) + '</div>',
+      '    <div class="time">' + esc(formatTime(reservation.startsAt)) + ' – ' + esc(formatTime(reservation.endsAt)),
+      '      <span class="duration">' + esc(formatDuration(reservation.durationMinutes)) + '</span>',
+      '    </div>',
+      '    <div class="guest">' + esc(reservation.guestName) + '</div>',
       dayLine,
-      '  <div class="row">',
-      '    <span><span class="label">Party</span> ' + reservation.partySize + '</span>',
-      phone,
-      '  </div>',
-      tables ? '  <div class="tables"><span class="label">Tables · </span>' + esc(tables) + '</div>' : '  <div class="tables"><span class="label">Tables · </span>unassigned</div>',
-      '  <div class="badges">',
-      '    <span class="badge s-' + esc(reservation.status) + '">' + esc(reservation.status.replace(/_/g, " ")) + '</span>',
-      depositLine ? '    <span class="badge d-' + esc(reservation.depositStatus) + '">' + esc(depositLine) + '</span>' : '',
-      '  </div>',
+      phoneLine,
+      tables
+        ? '    <div class="tables"><span class="label">Tables · </span>' + esc(tables) + '</div>'
+        : '    <div class="tables"><span class="label">Tables · </span>unassigned</div>',
+      '    <div class="badges">',
+      '      <span class="badge s-' + esc(reservation.status) + '">' + esc(reservation.status.replace(/_/g, " ")) + '</span>',
+      depositLine ? '      <span class="badge d-' + esc(reservation.depositStatus) + '">' + esc(depositLine) + '</span>' : '',
+      '    </div>',
       notes,
+      '  </div>',
       '</div>'
     ].filter(Boolean).join("\\n");
   }
