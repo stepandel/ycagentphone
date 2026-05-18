@@ -7,8 +7,24 @@ import { formatAvailabilityContextForTranscript } from "./reservation-store.js";
 import { buildSkillContext } from "./skills/index.js";
 import { observeOpenAIForTurn, withAnswerTrace, withKnowledgeRetrievalTrace } from "./tracing.js";
 import type { VoiceAnswer } from "./agentphone.js";
+import type { ResponseFunctionToolCall, Tool } from "openai/resources/responses/responses";
 
 const END_CALL_MARKER = "[[END_CALL]]";
+const END_CALL_TOOL_NAME = "end_call";
+
+const END_CALL_TOOL: Tool = {
+  type: "function",
+  name: END_CALL_TOOL_NAME,
+  description:
+    "End the active voice phone call only after the caller has explicitly said they are done, declined further help, or said goodbye.",
+  parameters: {
+    type: "object",
+    additionalProperties: false,
+    required: [],
+    properties: {}
+  },
+  strict: true
+};
 
 export type AnswerOptions = {
   transcript?: string;
@@ -24,11 +40,27 @@ export type AnswerService = (options: AnswerOptions) => Promise<AnswerResult>;
 
 let openai: OpenAI | undefined;
 
-function parseAnswerControl(text: string): VoiceAnswer {
+function requestedEndCall(response: { output?: unknown[] }): boolean {
+  return (
+    response.output?.some((item): item is ResponseFunctionToolCall => {
+      return (
+        typeof item === "object" &&
+        item !== null &&
+        "type" in item &&
+        item.type === "function_call" &&
+        "name" in item &&
+        item.name === END_CALL_TOOL_NAME
+      );
+    }) ?? false
+  );
+}
+
+export function parseAnswerControl(text: string, shouldHangup = false): VoiceAnswer {
   const hangup = text.includes(END_CALL_MARKER);
+  const cleanText = text.replaceAll(END_CALL_MARKER, "").trim();
   return {
-    text: text.replaceAll(END_CALL_MARKER, "").trim(),
-    ...(hangup ? { hangup: true } : {})
+    text: cleanText || (shouldHangup || hangup ? "Thanks for calling. Goodbye." : cleanText),
+    ...(shouldHangup || hangup ? { hangup: true } : {})
   };
 }
 
@@ -57,6 +89,7 @@ export const answerCaller: AnswerService = async ({ transcript, isCallStart, cal
   const response = await observeOpenAIForTurn(getOpenAI(), { transcript, isCallStart, callId, caller }).responses.create({
     model: config.OPENAI_MODEL,
     instructions: buildSystemPrompt(config.COMPANY_NAME, config.PUBLIC_CONTACT_EMAIL),
+    ...(channel === "voice" ? { tools: [END_CALL_TOOL], tool_choice: "auto" as const } : {}),
     input: [
       {
         role: "user",
@@ -86,5 +119,5 @@ export const answerCaller: AnswerService = async ({ transcript, isCallStart, cal
     ]
   });
 
-  return parseAnswerControl(response.output_text.trim());
+  return parseAnswerControl(response.output_text.trim(), requestedEndCall(response));
 });
