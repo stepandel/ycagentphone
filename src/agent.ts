@@ -2,8 +2,7 @@ import OpenAI from "openai";
 import { config } from "./config.js";
 import { formatKnowledgeSnippets, searchKnowledgebase, type KnowledgeSnippet } from "./memory.js";
 import { buildSystemPrompt } from "./prompt.js";
-import { formatReservationLogContextForCaller } from "./reservation-log.js";
-import { formatAvailabilityContextForTranscript } from "./reservation-store.js";
+import { formatAvailabilityContextForTranscript, formatReservationContextForCaller } from "./reservation-store.js";
 import { buildSkillContext } from "./skills/index.js";
 import { isReservationQuery } from "./skills/reservation-taking.js";
 import { observeOpenAIForTurn, withAnswerTrace, withKnowledgeRetrievalTrace } from "./tracing.js";
@@ -116,7 +115,7 @@ export const answerCaller: AnswerService = async ({ transcript, isCallStart, cal
   const knowledge = await withKnowledgeRetrievalTrace(transcript, () => searchKnowledgebase(transcript));
   const includeReservationContext = isReservationQuery(transcript);
   const skillContext = includeReservationContext ? buildSkillContext(transcript) : undefined;
-  const reservationLogContext = includeReservationContext ? await formatReservationLogContextForCaller(caller) : undefined;
+  const reservationLogContext = includeReservationContext ? formatReservationContextForCaller(caller) : undefined;
   const reservationAvailabilityContext = includeReservationContext ? formatAvailabilityContextForTranscript(transcript) : undefined;
 
   const response = await observeOpenAIForTurn(getOpenAI(), { transcript, isCallStart, callId, caller }).responses.create({

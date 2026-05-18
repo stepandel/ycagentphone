@@ -872,6 +872,62 @@ export function listReservations(db: Database, options: ListReservationsOptions 
   }));
 }
 
+export function formatReservationContextForCaller(caller: string | undefined): string {
+  if (!caller) return "No caller phone number was provided for reservation lookup.";
+  const db = openReservationDatabase();
+  try {
+    const reservation = findLatestReservationByPhone(db, caller);
+    if (!reservation) return "No reservation was found for this caller.";
+
+    const tables = db
+      .query<{ name: string }, [string]>(
+        `
+          SELECT t.name
+          FROM reservation_tables rt
+          JOIN dining_tables t ON t.id = rt.table_id
+          WHERE rt.reservation_id = ?
+          ORDER BY t.name
+        `
+      )
+      .all(reservation.id)
+      .map((row) => row.name);
+
+    const startDate = localDate(reservation.startsAt);
+    const startTime = localTime(reservation.startsAt);
+    const endTime = localTime(reservation.endsAt);
+    const depositAmount =
+      reservation.depositAmountCents && reservation.depositCurrency
+        ? new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency: reservation.depositCurrency.toUpperCase(),
+            maximumFractionDigits: reservation.depositAmountCents % 100 === 0 ? 0 : 2
+          }).format(reservation.depositAmountCents / 100)
+        : undefined;
+    const depositParts = [
+      reservation.depositStatus.replaceAll("_", " "),
+      depositAmount ? `amount: ${depositAmount}` : undefined,
+      reservation.depositPaidAt ? `paid at ${reservation.depositPaidAt}` : undefined,
+      reservation.depositPaymentLinkUrl ? `link: ${reservation.depositPaymentLinkUrl}` : undefined
+    ].filter(Boolean);
+
+    return [
+      `Reservation ID: ${reservation.id}`,
+      `Guest name: ${reservation.guestName}`,
+      `Party size: ${reservation.partySize}`,
+      `Date: ${startDate} (${config.RESTAURANT_TIME_ZONE})`,
+      `Time: ${startTime}-${endTime}`,
+      `Status: ${reservation.status.replaceAll("_", " ")}`,
+      `Deposit: ${depositParts.join("; ")}`,
+      tables.length ? `Tables: ${tables.join(", ")}` : "Tables: unassigned",
+      reservation.notes ? `Notes: ${reservation.notes}` : undefined
+    ]
+      .filter(Boolean)
+      .join("\n");
+  } finally {
+    db.close();
+  }
+}
+
 export function findLatestReservationByPhone(db: Database, phone: string): Reservation | undefined {
   const row = db
     .query<{ id: string }, [string]>(
