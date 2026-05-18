@@ -697,6 +697,11 @@ export function getReservation(db: Database, id: string): Reservation {
   };
 }
 
+export function deleteReservation(db: Database, id: string): boolean {
+  const result = db.prepare("DELETE FROM reservations WHERE id = ?").run(id);
+  return result.changes > 0;
+}
+
 export type ListReservationsOptions = {
   from?: string | Date;
   to?: string | Date;

@@ -268,6 +268,45 @@ export function renderAdminPage(options: { restaurantName: string; timeZone: str
     border-radius: 50%;
     background: var(--accent);
   }
+  .card .delete-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--ink-faint);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+    padding: 0;
+  }
+  .card:hover .delete-btn,
+  .card:focus-within .delete-btn,
+  .card .delete-btn:focus-visible {
+    opacity: 1;
+  }
+  .card .delete-btn:hover,
+  .card .delete-btn:focus-visible {
+    color: var(--bad);
+    background: color-mix(in srgb, var(--bad) 12%, var(--surface));
+    border-color: color-mix(in srgb, var(--bad) 35%, var(--border));
+    outline: none;
+  }
+  .card .delete-btn:disabled {
+    opacity: 0.5;
+    cursor: progress;
+  }
+  .card .delete-btn svg {
+    width: 14px;
+    height: 14px;
+    stroke-width: 2;
+  }
   .recent-section {
     margin-bottom: 32px;
     padding: 16px;
@@ -506,6 +545,8 @@ export function renderAdminPage(options: { restaurantName: string; timeZone: str
     return CONFIRMED_DEPOSIT_STATUSES.has(reservation.depositStatus);
   }
 
+  const TRASH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
+
   function renderCard(reservation, options) {
     const opts = options ?? {};
     const tables = reservation.tableIds.map(tableLabel).join(", ");
@@ -529,8 +570,10 @@ export function renderAdminPage(options: { restaurantName: string; timeZone: str
       isConfirmed(reservation) ? '' : 'is-unconfirmed'
     ].filter(Boolean).join(' ');
     const guestLabel = reservation.partySize === 1 ? 'guest' : 'guests';
+    const summary = formatTime(reservation.startsAt) + ' for ' + reservation.guestName + ' (party of ' + reservation.partySize + ')';
     return [
-      '<div class="' + cardClass + '">',
+      '<div class="' + cardClass + '" data-reservation-id="' + esc(reservation.id) + '" data-summary="' + esc(summary) + '">',
+      '  <button type="button" class="delete-btn" data-action="delete" aria-label="Delete reservation for ' + esc(reservation.guestName) + '" title="Delete reservation">' + TRASH_ICON + '</button>',
       '  <div class="party-block" title="Party of ' + reservation.partySize + '">',
       '    <div class="number">' + reservation.partySize + '</div>',
       '    <div class="label">' + guestLabel + '</div>',
@@ -638,6 +681,32 @@ export function renderAdminPage(options: { restaurantName: string; timeZone: str
   document.getElementById("search").addEventListener("input", (event) => {
     state.search = event.target.value;
     render();
+  });
+
+  async function deleteReservation(id, summary, button) {
+    if (!id) return;
+    if (!window.confirm("Delete reservation " + summary + "? This cannot be undone.")) return;
+    button.disabled = true;
+    try {
+      const response = await fetch("/admin/api/reservations/" + encodeURIComponent(id), { method: "DELETE" });
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({}));
+        throw new Error(detail.error || ("Delete failed: " + response.status));
+      }
+      state.reservations = state.reservations.filter((r) => r.id !== id);
+      render();
+    } catch (error) {
+      window.alert(error.message);
+      button.disabled = false;
+    }
+  }
+
+  document.getElementById("content").addEventListener("click", (event) => {
+    const button = event.target.closest('button[data-action="delete"]');
+    if (!button) return;
+    const card = button.closest(".card");
+    if (!card) return;
+    void deleteReservation(card.dataset.reservationId, card.dataset.summary || "this reservation", button);
   });
 
   load();

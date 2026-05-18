@@ -14,6 +14,7 @@ import { createPostCallService, type PostCallService } from "./post-call.js";
 import { recordReservationTextFollowUp } from "./reservation-log.js";
 import { warmKnowledgebase } from "./memory.js";
 import {
+  deleteReservation,
   listDiningTables,
   listReservations,
   openReservationDatabase,
@@ -184,6 +185,24 @@ export function createApp(
       res.json({ reservations, tables, timeZone: config.RESTAURANT_TIME_ZONE });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to load reservations.";
+      console.error(message);
+      res.status(500).json({ error: message });
+    } finally {
+      db.close();
+    }
+  });
+
+  app.delete("/admin/api/reservations/:id", (req, res) => {
+    const db = openReservationDatabase();
+    try {
+      const deleted = deleteReservation(db, req.params.id);
+      if (!deleted) {
+        res.status(404).json({ error: `Reservation not found: ${req.params.id}` });
+        return;
+      }
+      res.json({ ok: true, id: req.params.id });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to delete reservation.";
       console.error(message);
       res.status(500).json({ error: message });
     } finally {
