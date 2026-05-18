@@ -139,44 +139,68 @@ function formatStripePaymentConfirmation(reservation: Reservation): string {
   return `Thanks, your${amount} reservation deposit is paid. Your reservation at ${config.COMPANY_NAME} is confirmed.`;
 }
 
-function textFromTranscriptMessages(value: unknown): string | undefined {
+function latestCallerTextFromMessages(value: unknown): string | undefined {
   if (!Array.isArray(value)) return undefined;
-  const text = value
-    .map((message) => {
-      const item = asRecord(message);
-      const content = item.content ?? item.text ?? item.transcript ?? item.message ?? item.body;
-      return typeof content === "string" ? content.trim() : "";
-    })
-    .filter(Boolean)
-    .join("\n");
-  return text || undefined;
+  for (let index = value.length - 1; index >= 0; index -= 1) {
+    const item = asRecord(value[index]);
+    const role = String(item.role ?? item.speaker ?? item.from ?? item.direction ?? "").toLowerCase();
+    if (role === "agent" || role === "assistant" || role === "outbound") continue;
+    const content = item.content ?? item.text ?? item.transcript ?? item.message ?? item.body;
+    if (typeof content === "string" && content.trim()) return content.trim();
+  }
+  return undefined;
 }
 
-function reservationCheckTextCandidates(turn: ReturnType<typeof extractCallTurn>): string[] {
+function firstText(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function latestReservationCheckText(turn: ReturnType<typeof extractCallTurn>): string | undefined {
   const raw = asRecord(turn.raw);
   const data = asRecord(raw.data);
   const call = asRecord(raw.call);
   const conversation = asRecord(raw.conversation);
-  return [
-    turn.transcript,
-    textFromTranscriptMessages(raw.recentHistory),
-    textFromTranscriptMessages(raw.messages),
-    textFromTranscriptMessages(data.messages),
-    textFromTranscriptMessages(conversation.messages),
-    typeof raw.transcript === "string" ? raw.transcript : undefined,
-    typeof data.transcript === "string" ? data.transcript : undefined,
-    typeof call.transcript === "string" ? call.transcript : undefined,
-    typeof conversation.transcript === "string" ? conversation.transcript : undefined
-  ].filter((text): text is string => Boolean(text?.trim()));
+  const message = asRecord(raw.message);
+  const sms = asRecord(raw.sms);
+  const latestExplicitText = firstText(
+    raw.transcript,
+    raw.text,
+    raw.message,
+    raw.input,
+    raw.userInput,
+    raw.callerTranscript,
+    data.transcript,
+    data.text,
+    data.message,
+    data.body,
+    message.text,
+    message.body,
+    sms.text,
+    sms.body,
+    call.transcript,
+    conversation.transcript
+  );
+  if (latestExplicitText) return latestExplicitText;
+
+  return (
+    latestCallerTextFromMessages(data.messages) ??
+    latestCallerTextFromMessages(raw.messages) ??
+    latestCallerTextFromMessages(conversation.messages) ??
+    latestCallerTextFromMessages(raw.recentHistory) ??
+    latestCallerTextFromMessages(data.recentHistory) ??
+    turn.transcript
+  );
 }
 
 function needsReservationAvailabilityCheck(turn: ReturnType<typeof extractCallTurn>): boolean {
   if (turn.isCallStart) return false;
-  return reservationCheckTextCandidates(turn).some((text) => {
-    if (!isReservationQuery(text)) return false;
-    const parsed = parseReservationRequestText(text);
-    return Boolean(parsed.partySize && parsed.startsAt);
-  });
+  const text = latestReservationCheckText(turn);
+  if (!isReservationQuery(text)) return false;
+  const parsed = parseReservationRequestText(text);
+  return Boolean(parsed.partySize && parsed.startsAt);
 }
 
 function isTextFollowUp(req: Request, turn: ReturnType<typeof extractCallTurn>): boolean {

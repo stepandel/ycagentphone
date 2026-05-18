@@ -107,7 +107,7 @@ describe("server", () => {
     ]);
   });
 
-  it("streams an interim response when reservation details are in recent history", async () => {
+  it("does not stream an interim response when only older history has reservation details", async () => {
     let answeredTranscript = "";
     const app = createApp(async ({ transcript }) => {
       answeredTranscript = transcript ?? "";
@@ -127,23 +127,19 @@ describe("server", () => {
 
     const lines = response.text.trim().split("\n").map((line) => JSON.parse(line));
     expect(response.headers["content-type"]).toContain("application/x-ndjson");
-    expect(lines).toEqual([
-      { text: "Of course. Let me check that for you.", interim: true },
-      { text: "Yes, we have room at 7." }
-    ]);
+    expect(lines).toEqual([{ text: "Yes, we have room at 7." }]);
     expect(answeredTranscript).toContain("caller: Can I book a table for 4 next Friday?");
     expect(answeredTranscript).toContain("caller: Yes, that works.");
   });
 
-  it("streams an interim response for AgentPhone voice history even when channel is omitted", async () => {
+  it("streams an interim response for latest AgentPhone voice history even when channel is omitted", async () => {
     const app = createApp(async () => "Yes, we have room at 7.");
 
     const response = await postSigned(app, "/webhooks/agentphone", {
       event: "agent.message",
       recentHistory: [
-        { direction: "inbound", content: "Can I book a table for 4 next Friday?" },
-        { direction: "outbound", content: "What time would you like?" },
-        { direction: "inbound", content: "7pm." }
+        { direction: "outbound", content: "How can I help?" },
+        { direction: "inbound", content: "Can I book a table for 4 next Friday at 7pm?" }
       ]
     }).expect(200);
 
