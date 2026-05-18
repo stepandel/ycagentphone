@@ -1,6 +1,6 @@
-# ycagentphone
+# CallHost
 
-Prototype restaurant phone Q&A agent for AgentPhone webhooks backed by a Moss knowledgebase.
+CallHost is a restaurant phone host for AgentPhone webhooks, backed by a Moss knowledgebase.
 
 ## Architecture
 
