@@ -976,7 +976,9 @@ export function recordReservationCall(input: RecordReservationCallInput): Record
       phone: input.caller,
       partySize,
       startsAt,
-      notes: input.reservation.specialNotes?.trim() || undefined,
+      notes: input.reservation.specialNotes?.trim()
+        ? truncate(input.reservation.specialNotes.trim().replace(/\s+/g, " "), MAX_NOTES_TOTAL_CHARS)
+        : undefined,
       depositAmountCents: input.deposit?.amountCents,
       depositCurrency: input.deposit?.currency,
       depositPaymentLinkUrl: input.deposit?.paymentLinkUrl,
@@ -989,8 +991,8 @@ export function recordReservationCall(input: RecordReservationCallInput): Record
   }
 }
 
-const MAX_NOTE_CHARS = 160;
-const MAX_NOTES_TOTAL_CHARS = 600;
+const MAX_NOTE_CHARS = 80;
+const MAX_NOTES_TOTAL_CHARS = 200;
 
 function truncate(text: string, limit: number): string {
   if (text.length <= limit) return text;

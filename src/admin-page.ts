@@ -363,6 +363,16 @@ export function renderAdminPage(options: { restaurantName: string; timeZone: str
     border-top: 1px dashed var(--border);
     padding-top: 8px;
     font-style: italic;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    cursor: pointer;
+    word-break: break-word;
+  }
+  .card .notes.expanded {
+    -webkit-line-clamp: unset;
+    overflow: visible;
   }
   .badges { display: flex; gap: 6px; flex-wrap: wrap; }
   .badge {
@@ -554,7 +564,9 @@ export function renderAdminPage(options: { restaurantName: string; timeZone: str
     const phoneLine = reservation.phone
       ? '    <div class="row"><span><span class="label">Phone</span> ' + esc(reservation.phone) + '</span></div>'
       : '';
-    const notes = reservation.notes ? '    <div class="notes">' + esc(reservation.notes) + '</div>' : "";
+    const notes = reservation.notes
+      ? '    <div class="notes" title="' + esc(reservation.notes) + '">' + esc(reservation.notes) + '</div>'
+      : "";
     const showCreated = opts.showCreated && reservation.createdAt;
     const createdLine = showCreated
       ? '    <div class="created">created ' + esc(formatRelative(reservation.createdAt, opts.nowMs ?? Date.now())) + '</div>'
@@ -703,10 +715,14 @@ export function renderAdminPage(options: { restaurantName: string; timeZone: str
 
   document.getElementById("content").addEventListener("click", (event) => {
     const button = event.target.closest('button[data-action="delete"]');
-    if (!button) return;
-    const card = button.closest(".card");
-    if (!card) return;
-    void deleteReservation(card.dataset.reservationId, card.dataset.summary || "this reservation", button);
+    if (button) {
+      const card = button.closest(".card");
+      if (!card) return;
+      void deleteReservation(card.dataset.reservationId, card.dataset.summary || "this reservation", button);
+      return;
+    }
+    const notes = event.target.closest(".notes");
+    if (notes) notes.classList.toggle("expanded");
   });
 
   load();
