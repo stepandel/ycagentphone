@@ -1,5 +1,7 @@
 # CallHost
 
+One of the winners of AgentPhone YC Hackathon.
+
 CallHost is a restaurant phone host for AgentPhone webhooks, backed by a Moss knowledgebase.
 
 ## Architecture
